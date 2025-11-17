@@ -3,9 +3,14 @@
 <div align="center">
   <img width="340" src="assets/image.png">
 </div>
-
-[![PyPI version](https://img.shields.io/pypi/v/aiofranka)](https://pypi.org/project/aiofranka/)  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
-
+<p align="center">
+  <a href="https://pypi.org/project/aiofranka/">
+    <img src="https://img.shields.io/pypi/v/aiofranka" alt="CI">
+  </a>
+  <a href="https://opensource.org/licenses/MIT">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="CI">
+  </a>
+</p>
 This library is an asyncio-based client for controlling Franka robots using the official `pylibfranka` package as a control interface with Franka, and `mujoco` as kinematics/dynamics model. 
 
 
