@@ -10,6 +10,7 @@ import numpy as np
 from aiofranka.robot import RobotInterface
 from aiofranka import FrankaController
 import time 
+import os 
 
 
 async def main():
@@ -20,35 +21,41 @@ async def main():
 
     await controller.start()
 
-    kp_kds = [
-        (120.0, 10.0),
-        (80.0, 4.0), 
-        (60.0, 3.0), 
-        (40.0, 2.0), 
-    ]
-    
+    base = np.array([1, 1, 1, 1, 0.6, 0.6, 0.6])
 
-    logs = { 
-        'qpos': [], 
-        'qvel': [],
-        'qdes': [], 
-        'ctrl': [], 
-    }
+    kps = [ 16, 128, 512 ]
+    kds = [ 2,   8,   32  ]
 
-    for kp, kd in kp_kds:
-        print(f"Testing with kp={kp}, kd={kd}")
-        await controller.move([0, 0, 0.3, -1.57079, 0, 1.57079, -0.7853])
+    kp_kd_pairs = [ (kp, kd) for kp in kps for kd in kds ]
 
-        await asyncio.sleep(1.0)
 
-        # run the controller test 
-        print("switched to impedance control")
-        controller.switch("impedance")
+
+    for kp, kd in kp_kd_pairs:
 
         with controller.state_lock:
-            controller.kp = np.ones(7) * kp
-            controller.kd = np.ones(7) * kd
-        print(controller.kp, controller.kd)
+            controller.kp = base * 80
+            controller.kd = base * 4
+        await controller.move([0, 0, 0.3, -1.57079, 0, 1.57079, -0.7853])
+
+
+        print(f"Testing with kp={kp}, kd={kd}")
+
+        await asyncio.sleep(2.0)
+
+        # run the controller test 
+        controller.switch("impedance")
+        controller.set_freq(50)
+
+        with controller.state_lock:
+            controller.kp = base * kp
+            controller.kd = base * kd
+
+        logs = { 
+            'qpos': [], 
+            'qvel': [],
+            'qdes': [], 
+            'ctrl': [], 
+        }
 
 
         for cnt in range(200): 
@@ -60,15 +67,16 @@ async def main():
 
             delta = np.sin(cnt / 50.0 * np.pi) * 0.15
             init = controller.initial_qpos
-            print(controller.torque)
             await controller.set("q_desired", delta + init)
 
         # await controller.stop()
         await asyncio.sleep(1.0)
 
-    for key in logs.keys():
-        logs[key] = np.stack(logs[key])
-    np.savez("./examples/sysid.npz", **logs)
+        for key in logs.keys():
+            logs[key] = np.stack(logs[key])
+        
+        os.makedirs("./examples/sysid/", exist_ok=True)
+        np.savez(f"./examples/sysid/sysid_K{int(kp)}_D{int(kd)}.npz", **logs)
 
 
 if __name__ == "__main__":

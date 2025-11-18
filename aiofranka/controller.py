@@ -60,8 +60,6 @@ class FrankaController:
         await asyncio.sleep(5)
         self.track = False
 
-
-
     def initialize(self): 
 
         # Get initial state
@@ -127,9 +125,7 @@ class FrankaController:
         if sleep_time > 0:
             await asyncio.sleep(sleep_time)
         
-        # Update the attribute
-        with self.state_lock:
-            setattr(self, attr, value)
+        setattr(self, attr, value)
         
         # Update last update time to target (not actual) to avoid drift
         self._last_update_time[attr] = target_time
@@ -197,6 +193,7 @@ class FrankaController:
     async def start(self):
         """Start the background control loop"""
 
+        print("starting robot!")
         self.robot.start()
 
         if self.task is None or self.task.done():

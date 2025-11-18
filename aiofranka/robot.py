@@ -1,10 +1,14 @@
+import os
 import mujoco 
 import mujoco.viewer
 from pathlib import Path
 import numpy as np 
-import time 
+import time
+import requests 
+from aiofranka.client import FrankaLockUnlock
 
 CUR_DIR = Path(__file__).parent.resolve()
+
 
 class RobotInterface: 
 
@@ -48,6 +52,8 @@ class RobotInterface:
     def stop(self): 
         if self.real:
             self.robot.stop()
+
+
 
     def sync_mj(self): 
         """ Sync mujoco state with real robot state """

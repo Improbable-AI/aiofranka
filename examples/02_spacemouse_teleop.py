@@ -19,7 +19,7 @@ async def main():
     await asyncio.sleep(1.0)
 
     controller.switch("osc")
-    controller.ee_kp = np.array([300.0, 300.0, 300.0, 300.0, 300.0, 300.0])
+    controller.ee_kp = np.array([300.0, 300.0, 300.0, 1000.0, 1000.0, 1000.0])
     controller.ee_kd = np.ones(6) * 10.0
     controller.set_freq(50)  # Set 100Hz update rate
 
@@ -34,22 +34,20 @@ async def main():
         event = pyspacemouse.read()
 
         # Scale the inputs to get reasonable movements
-        translation_delta = np.clip(np.array([event.x, event.y, event.z]) * 0.03, -0.02, 0.02) 
-        rotation_delta = np.array([-event.pitch, event.roll, -event.yaw]) * 5.0
-        rotation_delta = np.clip(rotation_delta, -3.0, 3.0)
+        translation_delta = np.clip(np.array([event.x, event.y, event.z]) * 0.003, -0.003, 0.003) 
+        rotation_delta = np.array([-event.pitch, event.roll, -event.yaw]) * 0.5
+        rotation_delta = np.clip(rotation_delta, -0.5, 0.5)
         rotation_delta = R.from_euler('xyz', rotation_delta, degrees=True).as_matrix() 
 
         # Get current desired end-effector pose
         with controller.state_lock:
-            current_ee = controller.state['ee'].copy()
+            current_ee = controller.ee_desired.copy()
 
         # Update position
         current_ee[:3, 3] += translation_delta
+        # current_ee[:3, :3] = controller.initial_ee[:3, :3]
         current_ee[:3, :3] = rotation_delta @ current_ee[:3, :3]
 
-        # # Update orientation using small angle approximation
-        # rot_matrix = euler_to_rot_matrix(rotation_delta)
-        # current_ee[:3, :3] = rot_matrix @ current_ee[:3, :3]
 
         await controller.set("ee_desired", current_ee)
 

@@ -1,2 +1,7 @@
 dist/
 *.egg-info/
+examples/vision
+examples/03_collect.py
+examples/sysid
+data/
+aiofranka/__pycache__/
