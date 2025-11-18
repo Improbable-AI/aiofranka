@@ -1,76 +1,73 @@
+.. aiofranka documentation master file
+
 Welcome to aiofranka's documentation!
-=====================================
+======================================
+
+**aiofranka** is an asyncio-based client for controlling Franka robots using the official ``pylibfranka`` package as a control interface with Franka, and ``mujoco`` as kinematics/dynamics model.
 
 .. image:: https://img.shields.io/pypi/v/aiofranka
-   :target: https://pypi.org/project/aiofranka/
    :alt: PyPI version
+   :target: https://pypi.org/project/aiofranka/
 
 .. image:: https://img.shields.io/badge/License-MIT-yellow.svg
-   :target: https://opensource.org/licenses/MIT
    :alt: License: MIT
-
-**aiofranka** is an asyncio-based client for controlling Franka robots using the official 
-``pylibfranka`` package as a control interface with Franka, and ``mujoco`` as kinematics/dynamics model.
-
-Features
---------
-
-* **Asyncio-based control**: Non-blocking control loops running at 1kHz
-* **Multiple control modes**: Impedance control, Operational Space Control (OSC), and direct torque control
-* **Real-time trajectory generation**: Using Ruckig for smooth motion planning
-* **MuJoCo integration**: Accurate kinematics and dynamics simulation
-* **Rate-limited setters**: Precise timing control for controller updates
-
-Quick Links
------------
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
-
-   installation
-   quickstart
-   api
-   examples
+   :target: https://opensource.org/licenses/MIT
 
 Installation
 ------------
 
-1. Follow instructions from the official repository and install ``pylibfranka``.
-2. Install the package::
+1. Follow instructions `here <https://frankaemika.github.io/docs/>`_ and install ``pylibfranka``.
+2. Install the package:
 
-    pip install aiofranka
+.. code-block:: bash
 
-Quick Example
--------------
+   pip install aiofranka
+
+Quick Start
+-----------
 
 .. code-block:: python
 
-    import asyncio
-    import numpy as np
-    from aiofranka import RobotInterface, FrankaController
+   import asyncio 
+   import numpy as np 
+   from aiofranka import RobotInterface, FrankaController
 
-    async def main():
-        robot = RobotInterface("172.16.0.2")
-        controller = FrankaController(robot)
-        
-        await controller.start()
-        
-        # Move to a position
-        await controller.move([0, 0, 0.0, -1.57079, 0, 1.57079, -0.7853])
-        
-        # Switch to impedance control
-        controller.switch("impedance")
-        controller.kp = np.ones(7) * 80.0
-        controller.kd = np.ones(7) * 4.0
-        controller.set_freq(50)
-        
-        for cnt in range(100):
-            delta = np.sin(cnt / 50.0 * np.pi) * 0.1
-            await controller.set("q_desired", controller.initial_qpos + delta)
+   async def main():
+       robot = RobotInterface("172.16.0.2") 
+       controller = FrankaController(robot)
+       
+       await controller.start()
 
-    if __name__ == "__main__":
-        asyncio.run(main())
+       # Test the 1kHz connection with the robot 
+       await controller.test_connection()
+
+       # Move to a specific position
+       await controller.move([0, 0, 0.0, -1.57079, 0, 1.57079, -0.7853])
+
+       # Switch to impedance controller
+       controller.switch("impedance")
+       controller.kp = np.ones(7) * 80.0
+       controller.kd = np.ones(7) * 4.0
+       controller.set_freq(50) 
+       
+       for cnt in range(100): 
+           delta = np.sin(cnt / 50.0 * np.pi) * 0.1
+           init = controller.initial_qpos
+           await controller.set("q_desired", delta + init)
+
+   if __name__ == "__main__":
+       asyncio.run(main())
+
+Contents
+--------
+
+.. toctree::
+   :maxdepth: 2
+   :caption: API Reference:
+
+   api/robot
+   api/controller
+   api/client
 
 Indices and tables
 ==================

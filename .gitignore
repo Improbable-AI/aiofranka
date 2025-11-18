@@ -8,6 +8,10 @@ aiofranka/__pycache__/
 
 # Sphinx documentation
 docs/_build/
-docs/source/_build/
-*.html
-*.doctree
+docs/doctrees/
+docs/*.html
+docs/*.js
+docs/_static/
+docs/_sources/
+docs/api/
+!docs/source/
