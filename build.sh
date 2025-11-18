@@ -16,5 +16,8 @@ rm -rf docs/_build docs/doctrees docs/*.html docs/*.js docs/_static docs/_source
 echo "Building HTML documentation..."
 sphinx-build -b html docs/source docs
 
+# Add .nojekyll file to ensure GitHub Pages serves all files
+touch docs/.nojekyll
+
 echo "Documentation built successfully!"
 echo "Open docs/index.html in your browser to view the documentation."
