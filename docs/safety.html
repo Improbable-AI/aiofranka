@@ -1,0 +1,652 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Safety Guidelines &mdash; aiofranka 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=01f34227"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Troubleshooting" href="troubleshooting.html" />
+    <link rel="prev" title="Controllers" href="controllers.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            aiofranka
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="controllers.html">Controllers</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Safety Guidelines</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#general-safety">General Safety</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#before-you-start">Before You Start</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#physical-safety">Physical Safety</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#software-safety">Software Safety</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#always-use-try-finally">Always Use Try-Finally</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#start-conservative">Start Conservative</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#test-in-simulation">Test in Simulation</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#torque-limits">Torque Limits</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#understanding-limits">Understanding Limits</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torque-rate-limiting">Torque Rate Limiting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#monitor-torques">Monitor Torques</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#collision-behavior">Collision Behavior</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#configure-collision-thresholds">Configure Collision Thresholds</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#gain-tuning-safety">Gain Tuning Safety</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#safe-gain-ranges">Safe Gain Ranges</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#gradual-tuning">Gradual Tuning</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#motion-planning">Motion Planning</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#avoid-discontinuities">Avoid Discontinuities</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#check-joint-limits">Check Joint Limits</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#velocity-limits">Velocity Limits</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#emergency-procedures">Emergency Procedures</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#if-something-goes-wrong">If Something Goes Wrong</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#common-triggers">Common Triggers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#after-a-safety-stop">After a Safety Stop</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#network-safety">Network Safety</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#connection-quality">Connection Quality</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#wired-connection">Wired Connection</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#best-practices-checklist">Best Practices Checklist</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#before-running">Before Running</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#during-execution">During Execution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#after-execution">After Execution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#code-review-checklist">Code Review Checklist</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#advanced-safety">Advanced Safety</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#redundant-safety-checks">Redundant Safety Checks</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#logging">Logging</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#remember">Remember</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#next-steps">Next Steps</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api/robot.html">Robot Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/controller.html">Franka Controller</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/client.html">Client</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">aiofranka</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Safety Guidelines</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/safety.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="safety-guidelines">
+<h1>Safety Guidelines<a class="headerlink" href="#safety-guidelines" title="Link to this heading"></a></h1>
+<p><strong>Read this entire page before controlling a real robot.</strong></p>
+<p>Safety is paramount when working with robotic systems. This page outlines essential safety practices for using aiofranka.</p>
+<section id="general-safety">
+<h2>General Safety<a class="headerlink" href="#general-safety" title="Link to this heading"></a></h2>
+<section id="before-you-start">
+<h3>Before You Start<a class="headerlink" href="#before-you-start" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p><strong>Read the manual</strong>: Familiarize yourself with the Franka Emika robot documentation</p></li>
+<li><p><strong>Training</strong>: Ensure you have proper training in robot safety</p></li>
+<li><p><strong>Workspace</strong>: Clear the workspace of obstacles and people</p></li>
+<li><p><strong>Emergency stop</strong>: Know where the E-stop button is and keep it accessible</p></li>
+<li><p><strong>Test in simulation</strong>: Always test new code in simulation first</p></li>
+</ol>
+</section>
+<section id="physical-safety">
+<h3>Physical Safety<a class="headerlink" href="#physical-safety" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>⚠️ Never enter the robot workspace while it’s powered</p></li>
+<li><p>⚠️ Keep one hand near the E-stop at all times during testing</p></li>
+<li><p>⚠️ Start with slow, small motions</p></li>
+<li><p>⚠️ Never leave a running robot unattended</p></li>
+<li><p>⚠️ Use collaborative mode features when appropriate</p></li>
+</ul>
+</section>
+</section>
+<section id="software-safety">
+<h2>Software Safety<a class="headerlink" href="#software-safety" title="Link to this heading"></a></h2>
+<section id="always-use-try-finally">
+<h3>Always Use Try-Finally<a class="headerlink" href="#always-use-try-finally" title="Link to this heading"></a></h3>
+<p>Ensure the robot stops even if your code crashes:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">safe_control</span><span class="p">():</span>
+    <span class="n">robot</span> <span class="o">=</span> <span class="n">RobotInterface</span><span class="p">(</span><span class="s2">&quot;172.16.0.2&quot;</span><span class="p">)</span>
+    <span class="n">controller</span> <span class="o">=</span> <span class="n">FrankaController</span><span class="p">(</span><span class="n">robot</span><span class="p">)</span>
+
+    <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Your control code</span>
+        <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">move</span><span class="p">()</span>
+
+    <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Interrupted by user&quot;</span><span class="p">)</span>
+
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="c1"># ALWAYS stop</span>
+        <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+
+<span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">safe_control</span><span class="p">())</span>
+</pre></div>
+</div>
+</section>
+<section id="start-conservative">
+<h3>Start Conservative<a class="headerlink" href="#start-conservative" title="Link to this heading"></a></h3>
+<p>Begin with low gains and small motions:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># ✅ Good: Conservative starting point</span>
+<span class="n">controller</span><span class="o">.</span><span class="n">kp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="mf">20.0</span>
+<span class="n">controller</span><span class="o">.</span><span class="n">kd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="mf">2.0</span>
+
+<span class="c1"># ❌ Bad: Too aggressive</span>
+<span class="n">controller</span><span class="o">.</span><span class="n">kp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="mf">200.0</span>
+<span class="n">controller</span><span class="o">.</span><span class="n">kd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="mf">1.0</span>
+</pre></div>
+</div>
+</section>
+<section id="test-in-simulation">
+<h3>Test in Simulation<a class="headerlink" href="#test-in-simulation" title="Link to this heading"></a></h3>
+<p>Always test new code in simulation first:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Test your algorithm</span>
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">test_algorithm</span><span class="p">(</span><span class="n">use_real_robot</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="n">ip</span> <span class="o">=</span> <span class="s2">&quot;172.16.0.2&quot;</span> <span class="k">if</span> <span class="n">use_real_robot</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="n">robot</span> <span class="o">=</span> <span class="n">RobotInterface</span><span class="p">(</span><span class="n">ip</span><span class="p">)</span>
+    <span class="c1"># ... rest of code</span>
+
+<span class="c1"># First run in simulation</span>
+<span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">test_algorithm</span><span class="p">(</span><span class="n">use_real_robot</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+
+<span class="c1"># Then, if successful, try on real robot</span>
+<span class="c1"># asyncio.run(test_algorithm(use_real_robot=True))</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="torque-limits">
+<h2>Torque Limits<a class="headerlink" href="#torque-limits" title="Link to this heading"></a></h2>
+<section id="understanding-limits">
+<h3>Understanding Limits<a class="headerlink" href="#understanding-limits" title="Link to this heading"></a></h3>
+<p>The Franka FR3 has built-in torque limits:</p>
+<ul class="simple">
+<li><p><strong>Joints 1-4</strong>: ±87 Nm</p></li>
+<li><p><strong>Joints 5-7</strong>: ±12 Nm</p></li>
+</ul>
+<p>Exceeding these limits triggers a safety stop.</p>
+</section>
+<section id="torque-rate-limiting">
+<h3>Torque Rate Limiting<a class="headerlink" href="#torque-rate-limiting" title="Link to this heading"></a></h3>
+<p>aiofranka automatically limits torque rate of change:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Default: 990 Nm/s (safe)</span>
+<span class="n">controller</span><span class="o">.</span><span class="n">torque_diff_limit</span> <span class="o">=</span> <span class="mf">990.0</span>
+<span class="n">controller</span><span class="o">.</span><span class="n">clip</span> <span class="o">=</span> <span class="kc">True</span>  <span class="c1"># Enable rate limiting</span>
+</pre></div>
+</div>
+<p><strong>Do not disable</strong> unless you know what you’re doing:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># ⚠️ Dangerous! Only for advanced users</span>
+<span class="n">controller</span><span class="o">.</span><span class="n">clip</span> <span class="o">=</span> <span class="kc">False</span>
+</pre></div>
+</div>
+</section>
+<section id="monitor-torques">
+<h3>Monitor Torques<a class="headerlink" href="#monitor-torques" title="Link to this heading"></a></h3>
+<p>Add safety checks in your control loop:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">MAX_TORQUE</span> <span class="o">=</span> <span class="mf">80.0</span>  <span class="c1"># Nm (conservative)</span>
+
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1000</span><span class="p">):</span>
+    <span class="n">state</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">state</span>
+    <span class="n">torque</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="s1">&#39;last_torque&#39;</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">torque</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">MAX_TORQUE</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;WARNING: High torque detected!&quot;</span><span class="p">)</span>
+        <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+        <span class="k">break</span>
+
+    <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;q_desired&quot;</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="collision-behavior">
+<h2>Collision Behavior<a class="headerlink" href="#collision-behavior" title="Link to this heading"></a></h2>
+<section id="configure-collision-thresholds">
+<h3>Configure Collision Thresholds<a class="headerlink" href="#configure-collision-thresholds" title="Link to this heading"></a></h3>
+<p>The robot has configurable collision detection:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">robot</span> <span class="o">=</span> <span class="n">RobotInterface</span><span class="p">(</span><span class="s2">&quot;172.16.0.2&quot;</span><span class="p">)</span>
+
+<span class="c1"># Default: High thresholds (less sensitive)</span>
+<span class="n">robot</span><span class="o">.</span><span class="n">robot</span><span class="o">.</span><span class="n">set_collision_behavior</span><span class="p">(</span>
+    <span class="p">[</span><span class="mf">100.0</span><span class="p">]</span> <span class="o">*</span> <span class="mi">7</span><span class="p">,</span>  <span class="c1"># Joint contact thresholds</span>
+    <span class="p">[</span><span class="mf">100.0</span><span class="p">]</span> <span class="o">*</span> <span class="mi">7</span><span class="p">,</span>  <span class="c1"># Joint collision thresholds</span>
+    <span class="p">[</span><span class="mf">100.0</span><span class="p">]</span> <span class="o">*</span> <span class="mi">6</span><span class="p">,</span>  <span class="c1"># Cartesian contact thresholds</span>
+    <span class="p">[</span><span class="mf">100.0</span><span class="p">]</span> <span class="o">*</span> <span class="mi">6</span><span class="p">,</span>  <span class="c1"># Cartesian collision thresholds</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>For safer operation, use lower thresholds:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># More sensitive collision detection</span>
+<span class="n">robot</span><span class="o">.</span><span class="n">robot</span><span class="o">.</span><span class="n">set_collision_behavior</span><span class="p">(</span>
+    <span class="p">[</span><span class="mf">50.0</span><span class="p">]</span> <span class="o">*</span> <span class="mi">7</span><span class="p">,</span>   <span class="c1"># Joint contact</span>
+    <span class="p">[</span><span class="mf">50.0</span><span class="p">]</span> <span class="o">*</span> <span class="mi">7</span><span class="p">,</span>   <span class="c1"># Joint collision</span>
+    <span class="p">[</span><span class="mf">50.0</span><span class="p">]</span> <span class="o">*</span> <span class="mi">6</span><span class="p">,</span>   <span class="c1"># Cartesian contact</span>
+    <span class="p">[</span><span class="mf">50.0</span><span class="p">]</span> <span class="o">*</span> <span class="mi">6</span><span class="p">,</span>   <span class="c1"># Cartesian collision</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Lower thresholds mean more frequent safety stops but safer operation.</p>
+</div>
+</section>
+</section>
+<section id="gain-tuning-safety">
+<h2>Gain Tuning Safety<a class="headerlink" href="#gain-tuning-safety" title="Link to this heading"></a></h2>
+<section id="safe-gain-ranges">
+<h3>Safe Gain Ranges<a class="headerlink" href="#safe-gain-ranges" title="Link to this heading"></a></h3>
+<p>Recommended safe ranges for impedance control:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 35.0%" />
+<col style="width: 35.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Safe Range</p></th>
+<th class="head"><p>Danger Zone</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">kp</span></code></p></td>
+<td><p>10-100 Nm/rad</p></td>
+<td><p>&gt; 200 Nm/rad</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">kd</span></code></p></td>
+<td><p>1-10 Nm⋅s/rad</p></td>
+<td><p>&lt; 0.5 or &gt; 20</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ee_kp</span></code> (trans)</p></td>
+<td><p>100-400 N/m</p></td>
+<td><p>&gt; 600 N/m</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ee_kp</span></code> (rot)</p></td>
+<td><p>500-1500 Nm/rad</p></td>
+<td><p>&gt; 2500 Nm/rad</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="gradual-tuning">
+<h3>Gradual Tuning<a class="headerlink" href="#gradual-tuning" title="Link to this heading"></a></h3>
+<p>Increase gains gradually:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Start low</span>
+<span class="n">kp</span> <span class="o">=</span> <span class="mf">20.0</span>
+
+<span class="k">for</span> <span class="n">mult</span> <span class="ow">in</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">]:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Testing kp = </span><span class="si">{</span><span class="n">kp</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">mult</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">controller</span><span class="o">.</span><span class="n">kp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="n">kp</span> <span class="o">*</span> <span class="n">mult</span>
+    <span class="n">controller</span><span class="o">.</span><span class="n">kd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="n">kp</span> <span class="o">*</span> <span class="n">mult</span> <span class="o">/</span> <span class="mi">10</span>  <span class="c1"># Maintain damping ratio</span>
+
+    <span class="c1"># Test motion</span>
+    <span class="k">await</span> <span class="n">test_motion</span><span class="p">()</span>
+
+    <span class="c1"># Check if stable</span>
+    <span class="n">response</span> <span class="o">=</span> <span class="nb">input</span><span class="p">(</span><span class="s2">&quot;Stable? (y/n): &quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">response</span> <span class="o">!=</span> <span class="s1">&#39;y&#39;</span><span class="p">:</span>
+        <span class="k">break</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="motion-planning">
+<h2>Motion Planning<a class="headerlink" href="#motion-planning" title="Link to this heading"></a></h2>
+<section id="avoid-discontinuities">
+<h3>Avoid Discontinuities<a class="headerlink" href="#avoid-discontinuities" title="Link to this heading"></a></h3>
+<p>Sudden large changes in target position can trigger safety stops:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># ❌ Bad: Discontinuous jump</span>
+<span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;q_desired&quot;</span><span class="p">,</span> <span class="n">far_away_target</span><span class="p">)</span>
+
+<span class="c1"># ✅ Good: Use smooth trajectory</span>
+<span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">move</span><span class="p">(</span><span class="n">far_away_target</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Or interpolate manually:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># ✅ Good: Linear interpolation</span>
+<span class="n">start</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">state</span><span class="p">[</span><span class="s1">&#39;qpos&#39;</span><span class="p">]</span>
+<span class="n">target</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="o">...</span><span class="p">])</span>
+<span class="n">steps</span> <span class="o">=</span> <span class="mi">100</span>
+
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">steps</span><span class="p">):</span>
+    <span class="n">alpha</span> <span class="o">=</span> <span class="n">i</span> <span class="o">/</span> <span class="n">steps</span>
+    <span class="n">interpolated</span> <span class="o">=</span> <span class="n">start</span> <span class="o">+</span> <span class="n">alpha</span> <span class="o">*</span> <span class="p">(</span><span class="n">target</span> <span class="o">-</span> <span class="n">start</span><span class="p">)</span>
+    <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;q_desired&quot;</span><span class="p">,</span> <span class="n">interpolated</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="check-joint-limits">
+<h3>Check Joint Limits<a class="headerlink" href="#check-joint-limits" title="Link to this heading"></a></h3>
+<p>Verify targets are within joint limits:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># FR3 joint limits (approximate)</span>
+<span class="n">JOINT_LIMITS</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span>
+    <span class="p">[</span><span class="o">-</span><span class="mf">2.8973</span><span class="p">,</span> <span class="mf">2.8973</span><span class="p">],</span>
+    <span class="p">[</span><span class="o">-</span><span class="mf">1.7628</span><span class="p">,</span> <span class="mf">1.7628</span><span class="p">],</span>
+    <span class="p">[</span><span class="o">-</span><span class="mf">2.8973</span><span class="p">,</span> <span class="mf">2.8973</span><span class="p">],</span>
+    <span class="p">[</span><span class="o">-</span><span class="mf">3.0718</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.0698</span><span class="p">],</span>
+    <span class="p">[</span><span class="o">-</span><span class="mf">2.8973</span><span class="p">,</span> <span class="mf">2.8973</span><span class="p">],</span>
+    <span class="p">[</span><span class="o">-</span><span class="mf">0.0175</span><span class="p">,</span> <span class="mf">3.7525</span><span class="p">],</span>
+    <span class="p">[</span><span class="o">-</span><span class="mf">2.8973</span><span class="p">,</span> <span class="mf">2.8973</span><span class="p">]</span>
+<span class="p">])</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">check_limits</span><span class="p">(</span><span class="n">q</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">q_i</span><span class="p">,</span> <span class="p">(</span><span class="n">q_min</span><span class="p">,</span> <span class="n">q_max</span><span class="p">))</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="n">JOINT_LIMITS</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="n">q_i</span> <span class="o">&lt;</span> <span class="n">q_min</span> <span class="ow">or</span> <span class="n">q_i</span> <span class="o">&gt;</span> <span class="n">q_max</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Joint </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> out of limits: </span><span class="si">{</span><span class="n">q_i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">return</span> <span class="kc">True</span>
+
+<span class="c1"># Before sending command</span>
+<span class="k">if</span> <span class="n">check_limits</span><span class="p">(</span><span class="n">target</span><span class="p">):</span>
+    <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;q_desired&quot;</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Target violates joint limits!&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="velocity-limits">
+<h3>Velocity Limits<a class="headerlink" href="#velocity-limits" title="Link to this heading"></a></h3>
+<p>Monitor joint velocities:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">MAX_VEL</span> <span class="o">=</span> <span class="mf">2.0</span>  <span class="c1"># rad/s</span>
+
+<span class="n">state</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">state</span>
+<span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="s1">&#39;qvel&#39;</span><span class="p">])</span> <span class="o">&gt;</span> <span class="n">MAX_VEL</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;High velocity detected!&quot;</span><span class="p">)</span>
+    <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="emergency-procedures">
+<h2>Emergency Procedures<a class="headerlink" href="#emergency-procedures" title="Link to this heading"></a></h2>
+<section id="if-something-goes-wrong">
+<h3>If Something Goes Wrong<a class="headerlink" href="#if-something-goes-wrong" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p><strong>Press E-stop immediately</strong> if robot behaves unexpectedly</p></li>
+<li><p><strong>Ctrl+C</strong> to interrupt Python script</p></li>
+<li><p><strong>Check terminal</strong> for error messages</p></li>
+<li><p><strong>Review code</strong> before restarting</p></li>
+</ol>
+</section>
+<section id="common-triggers">
+<h3>Common Triggers<a class="headerlink" href="#common-triggers" title="Link to this heading"></a></h3>
+<p>Safety stops can be triggered by:</p>
+<ul class="simple">
+<li><p>Excessive torques (&gt; joint limits)</p></li>
+<li><p>High torque rate of change</p></li>
+<li><p>Collision detection</p></li>
+<li><p>Joint limit violations</p></li>
+<li><p>Communication loss</p></li>
+</ul>
+</section>
+<section id="after-a-safety-stop">
+<h3>After a Safety Stop<a class="headerlink" href="#after-a-safety-stop" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p><strong>Assess the situation</strong>: Was it a false alarm or real issue?</p></li>
+<li><p><strong>Review code</strong>: Check for discontinuities, high gains, or errors</p></li>
+<li><p><strong>Lower gains</strong>: Start more conservative</p></li>
+<li><p><strong>Unlock robot</strong>: May need to unlock brakes via Desk interface</p></li>
+<li><p><strong>Test again</strong>: Carefully restart with safer parameters</p></li>
+</ol>
+</section>
+</section>
+<section id="network-safety">
+<h2>Network Safety<a class="headerlink" href="#network-safety" title="Link to this heading"></a></h2>
+<section id="connection-quality">
+<h3>Connection Quality<a class="headerlink" href="#connection-quality" title="Link to this heading"></a></h3>
+<p>Poor network connection can cause issues:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Test connection before experiments</span>
+<span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">test_connection</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Expected output:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Control loop stats (last 1000 iterations):
+  Frequency: 1000.2 Hz (target: 1000 Hz)
+  Jitter (max-min): 0.040 ms
+</pre></div>
+</div>
+<p>If frequency &lt; 990 Hz or jitter &gt; 1 ms, investigate network issues.</p>
+</section>
+<section id="wired-connection">
+<h3>Wired Connection<a class="headerlink" href="#wired-connection" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>✅ Use wired Ethernet (not WiFi)</p></li>
+<li><p>✅ Direct connection or managed switch</p></li>
+<li><p>✅ Low-latency network (&lt; 1ms ping)</p></li>
+<li><p>❌ Avoid shared networks</p></li>
+<li><p>❌ Avoid VPN or tunnels</p></li>
+</ul>
+</section>
+</section>
+<section id="best-practices-checklist">
+<h2>Best Practices Checklist<a class="headerlink" href="#best-practices-checklist" title="Link to this heading"></a></h2>
+<section id="before-running">
+<h3>Before Running<a class="headerlink" href="#before-running" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>[ ] Workspace clear of obstacles and people</p></li>
+<li><p>[ ] E-stop accessible</p></li>
+<li><p>[ ] Code tested in simulation</p></li>
+<li><p>[ ] Conservative gains set</p></li>
+<li><p>[ ] Try-finally block in place</p></li>
+<li><p>[ ] Safety monitors implemented</p></li>
+<li><p>[ ] Network connection tested</p></li>
+</ul>
+</section>
+<section id="during-execution">
+<h3>During Execution<a class="headerlink" href="#during-execution" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>[ ] One hand near E-stop</p></li>
+<li><p>[ ] Monitor robot motion</p></li>
+<li><p>[ ] Watch terminal for errors</p></li>
+<li><p>[ ] Ready to interrupt (Ctrl+C)</p></li>
+</ul>
+</section>
+<section id="after-execution">
+<h3>After Execution<a class="headerlink" href="#after-execution" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>[ ] Review logs for anomalies</p></li>
+<li><p>[ ] Check joint positions/torques</p></li>
+<li><p>[ ] Gradually increase complexity</p></li>
+<li><p>[ ] Document any issues</p></li>
+</ul>
+</section>
+<section id="code-review-checklist">
+<h3>Code Review Checklist<a class="headerlink" href="#code-review-checklist" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>[ ] <code class="docutils literal notranslate"><span class="pre">await</span> <span class="pre">controller.start()</span></code> in try block</p></li>
+<li><p>[ ] <code class="docutils literal notranslate"><span class="pre">await</span> <span class="pre">controller.stop()</span></code> in finally block</p></li>
+<li><p>[ ] Gains within safe ranges</p></li>
+<li><p>[ ] No discontinuous commands</p></li>
+<li><p>[ ] Safety monitors present</p></li>
+<li><p>[ ] Error handling implemented</p></li>
+<li><p>[ ] Tested in simulation</p></li>
+</ul>
+</section>
+</section>
+<section id="advanced-safety">
+<h2>Advanced Safety<a class="headerlink" href="#advanced-safety" title="Link to this heading"></a></h2>
+<section id="redundant-safety-checks">
+<h3>Redundant Safety Checks<a class="headerlink" href="#redundant-safety-checks" title="Link to this heading"></a></h3>
+<p>Implement multiple layers of safety:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">SafeController</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">controller</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">controller</span> <span class="o">=</span> <span class="n">controller</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_torque</span> <span class="o">=</span> <span class="mf">70.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_vel</span> <span class="o">=</span> <span class="mf">2.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">emergency_stop</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">safe_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attr</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="c1"># Check state before sending</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">state</span>
+
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="s1">&#39;last_torque&#39;</span><span class="p">])</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_torque</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">emergency_stop</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Torque limit exceeded!&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="s1">&#39;qvel&#39;</span><span class="p">])</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_vel</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">emergency_stop</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Velocity limit exceeded!&quot;</span><span class="p">)</span>
+
+        <span class="c1"># If safe, send command</span>
+        <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">attr</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="logging">
+<h3>Logging<a class="headerlink" href="#logging" title="Link to this heading"></a></h3>
+<p>Log all commands and states for debugging:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+
+<span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span>
+    <span class="n">filename</span><span class="o">=</span><span class="s1">&#39;robot_control.log&#39;</span><span class="p">,</span>
+    <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span>
+    <span class="nb">format</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> - </span><span class="si">%(levelname)s</span><span class="s1"> - </span><span class="si">%(message)s</span><span class="s1">&#39;</span>
+<span class="p">)</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="c1"># Log important events</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Starting control loop&quot;</span><span class="p">)</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Gains: kp=</span><span class="si">{</span><span class="n">controller</span><span class="o">.</span><span class="n">kp</span><span class="si">}</span><span class="s2">, kd=</span><span class="si">{</span><span class="n">controller</span><span class="o">.</span><span class="n">kd</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="c1"># Log commands</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Setting q_desired: </span><span class="si">{</span><span class="n">target</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="remember">
+<h2>Remember<a class="headerlink" href="#remember" title="Link to this heading"></a></h2>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p><strong>Safety is your responsibility</strong></p>
+<ul class="simple">
+<li><p>The robot can cause injury or damage</p></li>
+<li><p>Always prioritize safety over performance</p></li>
+<li><p>When in doubt, press E-stop</p></li>
+<li><p>Start slow and conservative</p></li>
+<li><p>Test thoroughly in simulation</p></li>
+</ul>
+</div>
+</section>
+<section id="next-steps">
+<h2>Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Review <a class="reference internal" href="troubleshooting.html"><span class="doc">Troubleshooting</span></a> for common issues</p></li>
+<li><p>Study <a class="reference internal" href="examples.html"><span class="doc">Examples</span></a> with safety in mind</p></li>
+<li><p>Read the <a class="reference external" href="https://frankaemika.github.io/docs/">Franka Emika safety manual</a></p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="controllers.html" class="btn btn-neutral float-left" title="Controllers" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="troubleshooting.html" class="btn btn-neutral float-right" title="Troubleshooting" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, MIT Improbable AI Lab.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

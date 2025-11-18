@@ -5,12 +5,4 @@ Franka Controller
    :members:
    :undoc-members:
    :show-inheritance:
-
-FrankaController
-----------------
-
-.. autoclass:: aiofranka.controller.FrankaController
-   :members:
-   :undoc-members:
-   :show-inheritance:
    :special-members: __init__

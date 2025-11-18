@@ -19,7 +19,7 @@
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Robot Interface" href="api/robot.html" /> 
+    <link rel="next" title="Installation" href="installation.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -41,7 +41,19 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
+              <p class="caption" role="heading"><span class="caption-text">Getting Started:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="controllers.html">Controllers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="safety.html">Safety Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="api/robot.html">Robot Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/controller.html">Franka Controller</a></li>
@@ -74,68 +86,121 @@
              
   <section id="welcome-to-aiofranka-s-documentation">
 <h1>Welcome to aiofranka’s documentation!<a class="headerlink" href="#welcome-to-aiofranka-s-documentation" title="Link to this heading"></a></h1>
-<p><strong>aiofranka</strong> is an asyncio-based client for controlling Franka robots using the official <code class="docutils literal notranslate"><span class="pre">pylibfranka</span></code> package as a control interface with Franka, and <code class="docutils literal notranslate"><span class="pre">mujoco</span></code> as kinematics/dynamics model.</p>
+<p><strong>aiofranka</strong> is an asyncio-based Python library for controlling Franka Emika robots. It provides a high-level, asynchronous interface that combines:</p>
+<ul class="simple">
+<li><p><strong>pylibfranka</strong>: Official low-level control interface (1kHz torque control)</p></li>
+<li><p><strong>MuJoCo</strong>: Fast kinematics/dynamics computation</p></li>
+<li><p><strong>Ruckig</strong>: Smooth trajectory generation</p></li>
+</ul>
 <a class="reference external image-reference" href="https://pypi.org/project/aiofranka/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/aiofranka" />
 </a>
 <a class="reference external image-reference" href="https://opensource.org/licenses/MIT"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg" />
 </a>
-<section id="installation">
-<h2>Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h2>
-<ol class="arabic simple">
-<li><p>Follow instructions <a class="reference external" href="https://frankaemika.github.io/docs/">here</a> and install <code class="docutils literal notranslate"><span class="pre">pylibfranka</span></code>.</p></li>
-<li><p>Install the package:</p></li>
-</ol>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>aiofranka
-</pre></div>
-</div>
-</section>
-<section id="quick-start">
-<h2>Quick Start<a class="headerlink" href="#quick-start" title="Link to this heading"></a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">aiofranka</span><span class="w"> </span><span class="kn">import</span> <span class="n">RobotInterface</span><span class="p">,</span> <span class="n">FrankaController</span>
-
-<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
-    <span class="n">robot</span> <span class="o">=</span> <span class="n">RobotInterface</span><span class="p">(</span><span class="s2">&quot;172.16.0.2&quot;</span><span class="p">)</span>
-    <span class="n">controller</span> <span class="o">=</span> <span class="n">FrankaController</span><span class="p">(</span><span class="n">robot</span><span class="p">)</span>
-
-    <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
-
-    <span class="c1"># Test the 1kHz connection with the robot</span>
-    <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">test_connection</span><span class="p">()</span>
-
-    <span class="c1"># Move to a specific position</span>
-    <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">move</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.57079</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">1.57079</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.7853</span><span class="p">])</span>
-
-    <span class="c1"># Switch to impedance controller</span>
-    <span class="n">controller</span><span class="o">.</span><span class="n">switch</span><span class="p">(</span><span class="s2">&quot;impedance&quot;</span><span class="p">)</span>
-    <span class="n">controller</span><span class="o">.</span><span class="n">kp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="mf">80.0</span>
-    <span class="n">controller</span><span class="o">.</span><span class="n">kd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="mf">4.0</span>
-    <span class="n">controller</span><span class="o">.</span><span class="n">set_freq</span><span class="p">(</span><span class="mi">50</span><span class="p">)</span>
-
-    <span class="k">for</span> <span class="n">cnt</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">):</span>
-        <span class="n">delta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">cnt</span> <span class="o">/</span> <span class="mf">50.0</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
-        <span class="n">init</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">initial_qpos</span>
-        <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;q_desired&quot;</span><span class="p">,</span> <span class="n">delta</span> <span class="o">+</span> <span class="n">init</span><span class="p">)</span>
-
-<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
-    <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">main</span><span class="p">())</span>
-</pre></div>
-</div>
+<section id="features">
+<h2>Features<a class="headerlink" href="#features" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>🚀 <strong>High-frequency control</strong>: 1kHz torque control loop with asyncio integration</p></li>
+<li><p>🎮 <strong>Multiple controllers</strong>: Joint impedance, Operational Space Control (OSC), and direct torque control</p></li>
+<li><p>🔄 <strong>Hot-swappable</strong>: Switch controllers and gains at runtime without stopping</p></li>
+<li><p>📊 <strong>Real-time monitoring</strong>: Built-in connection testing and timing diagnostics</p></li>
+<li><p>🛡️ <strong>Safety features</strong>: Torque rate limiting and collision behavior configuration</p></li>
+<li><p>🎯 <strong>Smooth trajectories</strong>: Automatic trajectory generation with Ruckig</p></li>
+<li><p>💻 <strong>Simulation mode</strong>: Test without hardware using MuJoCo viewer</p></li>
+</ul>
 </section>
 <section id="contents">
 <h2>Contents<a class="headerlink" href="#contents" title="Link to this heading"></a></h2>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Getting Started:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#dependencies">Dependencies</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#installing-aiofranka">Installing aiofranka</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#verifying-installation">Verifying Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#first-time-robot-setup">First-Time Robot Setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#troubleshooting">Troubleshooting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#next-steps">Next Steps</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#basic-example">Basic Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#understanding-the-code">Understanding the Code</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#simulation-mode">Simulation Mode</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#reading-robot-state">Reading Robot State</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#controller-modes">Controller Modes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#common-patterns">Common Patterns</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#next-steps">Next Steps</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="examples.html#example-1-simple-motion">Example 1: Simple Motion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples.html#example-2-impedance-control">Example 2: Impedance Control</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples.html#example-3-operational-space-control">Example 3: Operational Space Control</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples.html#example-4-data-collection">Example 4: Data Collection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples.html#example-5-teleoperation">Example 5: Teleoperation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples.html#example-6-custom-controller">Example 6: Custom Controller</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples.html#example-7-gain-tuning">Example 7: Gain Tuning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples.html#example-8-simulation-testing">Example 8: Simulation Testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples.html#more-examples">More Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples.html#next-steps">Next Steps</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">User Guide:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="controllers.html">Controllers</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="controllers.html#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="controllers.html#impedance-control">Impedance Control</a></li>
+<li class="toctree-l2"><a class="reference internal" href="controllers.html#operational-space-control-osc">Operational Space Control (OSC)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="controllers.html#direct-torque-control">Direct Torque Control</a></li>
+<li class="toctree-l2"><a class="reference internal" href="controllers.html#switching-controllers">Switching Controllers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="controllers.html#performance-comparison">Performance Comparison</a></li>
+<li class="toctree-l2"><a class="reference internal" href="controllers.html#troubleshooting">Troubleshooting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="controllers.html#next-steps">Next Steps</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="safety.html">Safety Guidelines</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="safety.html#general-safety">General Safety</a></li>
+<li class="toctree-l2"><a class="reference internal" href="safety.html#software-safety">Software Safety</a></li>
+<li class="toctree-l2"><a class="reference internal" href="safety.html#torque-limits">Torque Limits</a></li>
+<li class="toctree-l2"><a class="reference internal" href="safety.html#collision-behavior">Collision Behavior</a></li>
+<li class="toctree-l2"><a class="reference internal" href="safety.html#gain-tuning-safety">Gain Tuning Safety</a></li>
+<li class="toctree-l2"><a class="reference internal" href="safety.html#motion-planning">Motion Planning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="safety.html#emergency-procedures">Emergency Procedures</a></li>
+<li class="toctree-l2"><a class="reference internal" href="safety.html#network-safety">Network Safety</a></li>
+<li class="toctree-l2"><a class="reference internal" href="safety.html#best-practices-checklist">Best Practices Checklist</a></li>
+<li class="toctree-l2"><a class="reference internal" href="safety.html#advanced-safety">Advanced Safety</a></li>
+<li class="toctree-l2"><a class="reference internal" href="safety.html#remember">Remember</a></li>
+<li class="toctree-l2"><a class="reference internal" href="safety.html#next-steps">Next Steps</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="troubleshooting.html#connection-issues">Connection Issues</a></li>
+<li class="toctree-l2"><a class="reference internal" href="troubleshooting.html#robot-behavior-issues">Robot Behavior Issues</a></li>
+<li class="toctree-l2"><a class="reference internal" href="troubleshooting.html#control-loop-issues">Control Loop Issues</a></li>
+<li class="toctree-l2"><a class="reference internal" href="troubleshooting.html#osc-issues">OSC Issues</a></li>
+<li class="toctree-l2"><a class="reference internal" href="troubleshooting.html#programming-issues">Programming Issues</a></li>
+<li class="toctree-l2"><a class="reference internal" href="troubleshooting.html#simulation-vs-real-discrepancies">Simulation vs Real Discrepancies</a></li>
+<li class="toctree-l2"><a class="reference internal" href="troubleshooting.html#getting-help">Getting Help</a></li>
+<li class="toctree-l2"><a class="reference internal" href="troubleshooting.html#debug-workflow">Debug Workflow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="troubleshooting.html#common-error-messages">Common Error Messages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="troubleshooting.html#still-stuck">Still Stuck?</a></li>
+</ul>
+</li>
+</ul>
+</div>
 <div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="api/robot.html">Robot Interface</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="api/robot.html#aiofranka.robot.RobotInterface"><code class="docutils literal notranslate"><span class="pre">RobotInterface</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api/robot.html#robotinterface">RobotInterface</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="api/controller.html">Franka Controller</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="api/controller.html#aiofranka.controller.FrankaController"><code class="docutils literal notranslate"><span class="pre">FrankaController</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="api/controller.html#frankacontroller">FrankaController</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="api/client.html">Client</a><ul>
@@ -160,7 +225,7 @@
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="api/robot.html" class="btn btn-neutral float-right" title="Robot Interface" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="installation.html" class="btn btn-neutral float-right" title="Installation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

@@ -1,0 +1,576 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Examples &mdash; aiofranka 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=01f34227"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Controllers" href="controllers.html" />
+    <link rel="prev" title="Quick Start" href="quickstart.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            aiofranka
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#example-1-simple-motion">Example 1: Simple Motion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#example-2-impedance-control">Example 2: Impedance Control</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#example-3-operational-space-control">Example 3: Operational Space Control</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#example-4-data-collection">Example 4: Data Collection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#example-5-teleoperation">Example 5: Teleoperation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#example-6-custom-controller">Example 6: Custom Controller</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#example-7-gain-tuning">Example 7: Gain Tuning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#example-8-simulation-testing">Example 8: Simulation Testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#more-examples">More Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#next-steps">Next Steps</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="controllers.html">Controllers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="safety.html">Safety Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api/robot.html">Robot Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/controller.html">Franka Controller</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/client.html">Client</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">aiofranka</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Examples</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/examples.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="examples">
+<h1>Examples<a class="headerlink" href="#examples" title="Link to this heading"></a></h1>
+<p>This page provides complete, working examples for common use cases.</p>
+<section id="example-1-simple-motion">
+<h2>Example 1: Simple Motion<a class="headerlink" href="#example-1-simple-motion" title="Link to this heading"></a></h2>
+<p>Move the robot through a series of positions:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">aiofranka</span><span class="w"> </span><span class="kn">import</span> <span class="n">RobotInterface</span><span class="p">,</span> <span class="n">FrankaController</span>
+
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">simple_motion</span><span class="p">():</span>
+    <span class="n">robot</span> <span class="o">=</span> <span class="n">RobotInterface</span><span class="p">(</span><span class="s2">&quot;172.16.0.2&quot;</span><span class="p">)</span>
+    <span class="n">controller</span> <span class="o">=</span> <span class="n">FrankaController</span><span class="p">(</span><span class="n">robot</span><span class="p">)</span>
+
+    <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Define waypoints</span>
+        <span class="n">home</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.57079</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">1.57079</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.7853</span><span class="p">]</span>
+        <span class="n">pose1</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.785</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mf">2.356</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">1.571</span><span class="p">,</span> <span class="mf">0.785</span><span class="p">]</span>
+        <span class="n">pose2</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.785</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mf">2.356</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">1.571</span><span class="p">,</span> <span class="mf">0.785</span><span class="p">]</span>
+
+        <span class="c1"># Move through waypoints</span>
+        <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="p">[</span><span class="n">home</span><span class="p">,</span> <span class="n">pose1</span><span class="p">,</span> <span class="n">pose2</span><span class="p">,</span> <span class="n">home</span><span class="p">]:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Moving to: </span><span class="si">{</span><span class="n">pose</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">move</span><span class="p">(</span><span class="n">pose</span><span class="p">)</span>
+            <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">1.0</span><span class="p">)</span>  <span class="c1"># Pause at each waypoint</span>
+
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">simple_motion</span><span class="p">())</span>
+</pre></div>
+</div>
+</section>
+<section id="example-2-impedance-control">
+<h2>Example 2: Impedance Control<a class="headerlink" href="#example-2-impedance-control" title="Link to this heading"></a></h2>
+<p>Compliant joint-space control with sinusoidal motion:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">aiofranka</span><span class="w"> </span><span class="kn">import</span> <span class="n">RobotInterface</span><span class="p">,</span> <span class="n">FrankaController</span>
+
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">impedance_demo</span><span class="p">():</span>
+    <span class="n">robot</span> <span class="o">=</span> <span class="n">RobotInterface</span><span class="p">(</span><span class="s2">&quot;172.16.0.2&quot;</span><span class="p">)</span>
+    <span class="n">controller</span> <span class="o">=</span> <span class="n">FrankaController</span><span class="p">(</span><span class="n">robot</span><span class="p">)</span>
+
+    <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Move to start position</span>
+        <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">move</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.57</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">1.57</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.785</span><span class="p">])</span>
+
+        <span class="c1"># Configure impedance control</span>
+        <span class="n">controller</span><span class="o">.</span><span class="n">switch</span><span class="p">(</span><span class="s2">&quot;impedance&quot;</span><span class="p">)</span>
+        <span class="n">controller</span><span class="o">.</span><span class="n">kp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="mf">80.0</span>
+        <span class="n">controller</span><span class="o">.</span><span class="n">kd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="mf">4.0</span>
+        <span class="n">controller</span><span class="o">.</span><span class="n">set_freq</span><span class="p">(</span><span class="mi">50</span><span class="p">)</span>
+
+        <span class="c1"># Execute smooth motion</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Executing sinusoidal motion...&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">200</span><span class="p">):</span>  <span class="c1"># 4 seconds at 50 Hz</span>
+            <span class="c1"># Sinusoidal variation on joint 3</span>
+            <span class="n">delta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">i</span> <span class="o">/</span> <span class="mf">50.0</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.15</span>
+            <span class="n">target</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">initial_qpos</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">target</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">+=</span> <span class="n">delta</span>
+
+            <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;q_desired&quot;</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Motion complete!&quot;</span><span class="p">)</span>
+
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">impedance_demo</span><span class="p">())</span>
+</pre></div>
+</div>
+</section>
+<section id="example-3-operational-space-control">
+<h2>Example 3: Operational Space Control<a class="headerlink" href="#example-3-operational-space-control" title="Link to this heading"></a></h2>
+<p>Control end-effector position in Cartesian space:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">aiofranka</span><span class="w"> </span><span class="kn">import</span> <span class="n">RobotInterface</span><span class="p">,</span> <span class="n">FrankaController</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy.spatial.transform</span><span class="w"> </span><span class="kn">import</span> <span class="n">Rotation</span> <span class="k">as</span> <span class="n">R</span>
+
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">osc_demo</span><span class="p">():</span>
+    <span class="n">robot</span> <span class="o">=</span> <span class="n">RobotInterface</span><span class="p">(</span><span class="s2">&quot;172.16.0.2&quot;</span><span class="p">)</span>
+    <span class="n">controller</span> <span class="o">=</span> <span class="n">FrankaController</span><span class="p">(</span><span class="n">robot</span><span class="p">)</span>
+
+    <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Move to start position</span>
+        <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">move</span><span class="p">()</span>
+        <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">1.0</span><span class="p">)</span>
+
+        <span class="c1"># Configure OSC</span>
+        <span class="n">controller</span><span class="o">.</span><span class="n">switch</span><span class="p">(</span><span class="s2">&quot;osc&quot;</span><span class="p">)</span>
+        <span class="n">controller</span><span class="o">.</span><span class="n">ee_kp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">])</span>
+        <span class="n">controller</span><span class="o">.</span><span class="n">ee_kd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">6</span><span class="p">)</span> <span class="o">*</span> <span class="mf">10.0</span>
+        <span class="n">controller</span><span class="o">.</span><span class="n">set_freq</span><span class="p">(</span><span class="mi">50</span><span class="p">)</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Moving in Cartesian space...&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Circular motion in XY plane</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">200</span><span class="p">):</span>
+            <span class="n">angle</span> <span class="o">=</span> <span class="n">i</span> <span class="o">/</span> <span class="mf">50.0</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span>
+            <span class="n">radius</span> <span class="o">=</span> <span class="mf">0.05</span>
+
+            <span class="n">desired_ee</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">initial_ee</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">desired_ee</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span> <span class="o">+=</span> <span class="n">radius</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">angle</span><span class="p">)</span>
+            <span class="n">desired_ee</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span> <span class="o">+=</span> <span class="n">radius</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">angle</span><span class="p">)</span>
+
+            <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;ee_desired&quot;</span><span class="p">,</span> <span class="n">desired_ee</span><span class="p">)</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Circle complete!&quot;</span><span class="p">)</span>
+
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">osc_demo</span><span class="p">())</span>
+</pre></div>
+</div>
+</section>
+<section id="example-4-data-collection">
+<h2>Example 4: Data Collection<a class="headerlink" href="#example-4-data-collection" title="Link to this heading"></a></h2>
+<p>Collect synchronized robot data during operation:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">aiofranka</span><span class="w"> </span><span class="kn">import</span> <span class="n">RobotInterface</span><span class="p">,</span> <span class="n">FrankaController</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">collect_data</span><span class="p">():</span>
+    <span class="n">robot</span> <span class="o">=</span> <span class="n">RobotInterface</span><span class="p">(</span><span class="s2">&quot;172.16.0.2&quot;</span><span class="p">)</span>
+    <span class="n">controller</span> <span class="o">=</span> <span class="n">FrankaController</span><span class="p">(</span><span class="n">robot</span><span class="p">)</span>
+
+    <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Move to start</span>
+        <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">move</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.57</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">1.57</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.785</span><span class="p">])</span>
+
+        <span class="c1"># Setup impedance control</span>
+        <span class="n">controller</span><span class="o">.</span><span class="n">switch</span><span class="p">(</span><span class="s2">&quot;impedance&quot;</span><span class="p">)</span>
+        <span class="n">controller</span><span class="o">.</span><span class="n">kp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="mf">80.0</span>
+        <span class="n">controller</span><span class="o">.</span><span class="n">kd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="mf">4.0</span>
+        <span class="n">controller</span><span class="o">.</span><span class="n">set_freq</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span>  <span class="c1"># 100 Hz</span>
+
+        <span class="c1"># Data storage</span>
+        <span class="n">logs</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;qpos&#39;</span><span class="p">:</span> <span class="p">[],</span>
+            <span class="s1">&#39;qvel&#39;</span><span class="p">:</span> <span class="p">[],</span>
+            <span class="s1">&#39;qdes&#39;</span><span class="p">:</span> <span class="p">[],</span>
+            <span class="s1">&#39;ctrl&#39;</span><span class="p">:</span> <span class="p">[],</span>
+            <span class="s1">&#39;ee&#39;</span><span class="p">:</span> <span class="p">[],</span>
+            <span class="s1">&#39;timestamp&#39;</span><span class="p">:</span> <span class="p">[]</span>
+        <span class="p">}</span>
+
+        <span class="n">start_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Collecting data...&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">500</span><span class="p">):</span>  <span class="c1"># 5 seconds at 100 Hz</span>
+            <span class="c1"># Log data</span>
+            <span class="n">state</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">state</span>
+            <span class="n">logs</span><span class="p">[</span><span class="s1">&#39;qpos&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="s1">&#39;qpos&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">())</span>
+            <span class="n">logs</span><span class="p">[</span><span class="s1">&#39;qvel&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="s1">&#39;qvel&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">())</span>
+            <span class="n">logs</span><span class="p">[</span><span class="s1">&#39;ctrl&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="s1">&#39;last_torque&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">())</span>
+            <span class="n">logs</span><span class="p">[</span><span class="s1">&#39;ee&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="s1">&#39;ee&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">())</span>
+            <span class="n">logs</span><span class="p">[</span><span class="s1">&#39;qdes&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">controller</span><span class="o">.</span><span class="n">q_desired</span><span class="o">.</span><span class="n">copy</span><span class="p">())</span>
+            <span class="n">logs</span><span class="p">[</span><span class="s1">&#39;timestamp&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span><span class="p">)</span>
+
+            <span class="c1"># Execute motion</span>
+            <span class="n">delta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">i</span> <span class="o">/</span> <span class="mf">100.0</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
+            <span class="n">target</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">initial_qpos</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">target</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">+=</span> <span class="n">delta</span>
+
+            <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;q_desired&quot;</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>
+
+        <span class="c1"># Convert to numpy arrays</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">logs</span><span class="p">:</span>
+            <span class="n">logs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">logs</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+
+        <span class="c1"># Save data</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">savez</span><span class="p">(</span><span class="s2">&quot;robot_data.npz&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">logs</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saved </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">logs</span><span class="p">[</span><span class="s1">&#39;qpos&#39;</span><span class="p">])</span><span class="si">}</span><span class="s2"> samples to robot_data.npz&quot;</span><span class="p">)</span>
+
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">collect_data</span><span class="p">())</span>
+</pre></div>
+</div>
+</section>
+<section id="example-5-teleoperation">
+<h2>Example 5: Teleoperation<a class="headerlink" href="#example-5-teleoperation" title="Link to this heading"></a></h2>
+<p>Control robot with SpaceMouse (requires <code class="docutils literal notranslate"><span class="pre">pyspacemouse</span></code>):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">aiofranka</span><span class="w"> </span><span class="kn">import</span> <span class="n">RobotInterface</span><span class="p">,</span> <span class="n">FrankaController</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy.spatial.transform</span><span class="w"> </span><span class="kn">import</span> <span class="n">Rotation</span> <span class="k">as</span> <span class="n">R</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pyspacemouse</span>
+
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">teleoperation</span><span class="p">():</span>
+    <span class="n">robot</span> <span class="o">=</span> <span class="n">RobotInterface</span><span class="p">(</span><span class="s2">&quot;172.16.0.2&quot;</span><span class="p">)</span>
+    <span class="n">controller</span> <span class="o">=</span> <span class="n">FrankaController</span><span class="p">(</span><span class="n">robot</span><span class="p">)</span>
+
+    <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+    <span class="c1"># Connect SpaceMouse</span>
+    <span class="n">success</span> <span class="o">=</span> <span class="n">pyspacemouse</span><span class="o">.</span><span class="n">open</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">success</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Failed to connect SpaceMouse&quot;</span><span class="p">)</span>
+        <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+        <span class="k">return</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Move to start</span>
+        <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">move</span><span class="p">()</span>
+        <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">1.0</span><span class="p">)</span>
+
+        <span class="c1"># Configure OSC</span>
+        <span class="n">controller</span><span class="o">.</span><span class="n">switch</span><span class="p">(</span><span class="s2">&quot;osc&quot;</span><span class="p">)</span>
+        <span class="n">controller</span><span class="o">.</span><span class="n">ee_kp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">])</span>
+        <span class="n">controller</span><span class="o">.</span><span class="n">ee_kd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">6</span><span class="p">)</span> <span class="o">*</span> <span class="mf">10.0</span>
+        <span class="n">controller</span><span class="o">.</span><span class="n">set_freq</span><span class="p">(</span><span class="mi">50</span><span class="p">)</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Teleoperation active. Use SpaceMouse to control robot.&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Press Ctrl+C to stop.&quot;</span><span class="p">)</span>
+
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="c1"># Read SpaceMouse</span>
+            <span class="n">event</span> <span class="o">=</span> <span class="n">pyspacemouse</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+
+            <span class="c1"># Scale inputs</span>
+            <span class="n">translation</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">event</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">event</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">event</span><span class="o">.</span><span class="n">z</span><span class="p">])</span> <span class="o">*</span> <span class="mf">0.003</span><span class="p">,</span>
+                <span class="o">-</span><span class="mf">0.003</span><span class="p">,</span> <span class="mf">0.003</span>
+            <span class="p">)</span>
+            <span class="n">rotation</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="n">event</span><span class="o">.</span><span class="n">yaw</span><span class="p">])</span> <span class="o">*</span> <span class="mf">0.5</span>
+            <span class="n">rotation</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">rotation</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">)</span>
+            <span class="n">rotation_delta</span> <span class="o">=</span> <span class="n">R</span><span class="o">.</span><span class="n">from_euler</span><span class="p">(</span><span class="s1">&#39;xyz&#39;</span><span class="p">,</span> <span class="n">rotation</span><span class="p">,</span> <span class="n">degrees</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">as_matrix</span><span class="p">()</span>
+
+            <span class="c1"># Update desired pose</span>
+            <span class="n">current_ee</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">ee_desired</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">current_ee</span><span class="p">[:</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span> <span class="o">+=</span> <span class="n">translation</span>
+            <span class="n">current_ee</span><span class="p">[:</span><span class="mi">3</span><span class="p">,</span> <span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">rotation_delta</span> <span class="o">@</span> <span class="n">current_ee</span><span class="p">[:</span><span class="mi">3</span><span class="p">,</span> <span class="p">:</span><span class="mi">3</span><span class="p">]</span>
+
+            <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;ee_desired&quot;</span><span class="p">,</span> <span class="n">current_ee</span><span class="p">)</span>
+
+    <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Stopping teleoperation...&quot;</span><span class="p">)</span>
+
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">pyspacemouse</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">teleoperation</span><span class="p">())</span>
+</pre></div>
+</div>
+</section>
+<section id="example-6-custom-controller">
+<h2>Example 6: Custom Controller<a class="headerlink" href="#example-6-custom-controller" title="Link to this heading"></a></h2>
+<p>Implement your own control law using torque mode:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">aiofranka</span><span class="w"> </span><span class="kn">import</span> <span class="n">RobotInterface</span><span class="p">,</span> <span class="n">FrankaController</span>
+
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">custom_controller</span><span class="p">():</span>
+    <span class="n">robot</span> <span class="o">=</span> <span class="n">RobotInterface</span><span class="p">(</span><span class="s2">&quot;172.16.0.2&quot;</span><span class="p">)</span>
+    <span class="n">controller</span> <span class="o">=</span> <span class="n">FrankaController</span><span class="p">(</span><span class="n">robot</span><span class="p">)</span>
+
+    <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Move to start</span>
+        <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">move</span><span class="p">()</span>
+
+        <span class="c1"># Switch to torque mode</span>
+        <span class="n">controller</span><span class="o">.</span><span class="n">switch</span><span class="p">(</span><span class="s2">&quot;torque&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Control parameters</span>
+        <span class="n">kp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="mf">60.0</span>
+        <span class="n">kd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="mf">3.0</span>
+        <span class="n">target</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">initial_qpos</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Running custom controller...&quot;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">500</span><span class="p">):</span>
+            <span class="c1"># Get state</span>
+            <span class="n">state</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">state</span>
+            <span class="n">q</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="s1">&#39;qpos&#39;</span><span class="p">]</span>
+            <span class="n">dq</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="s1">&#39;qvel&#39;</span><span class="p">]</span>
+
+            <span class="c1"># Compute control torque (simple PD)</span>
+            <span class="n">tau</span> <span class="o">=</span> <span class="n">kp</span> <span class="o">*</span> <span class="p">(</span><span class="n">target</span> <span class="o">-</span> <span class="n">q</span><span class="p">)</span> <span class="o">-</span> <span class="n">kd</span> <span class="o">*</span> <span class="n">dq</span>
+
+            <span class="c1"># Set torque (thread-safe)</span>
+            <span class="k">with</span> <span class="n">controller</span><span class="o">.</span><span class="n">state_lock</span><span class="p">:</span>
+                <span class="n">controller</span><span class="o">.</span><span class="n">torque</span> <span class="o">=</span> <span class="n">tau</span>
+
+            <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="mf">500.0</span><span class="p">)</span>  <span class="c1"># 500 Hz</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Custom control complete!&quot;</span><span class="p">)</span>
+
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">custom_controller</span><span class="p">())</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Direct torque control requires careful implementation. Test in simulation first!</p>
+</div>
+</section>
+<section id="example-7-gain-tuning">
+<h2>Example 7: Gain Tuning<a class="headerlink" href="#example-7-gain-tuning" title="Link to this heading"></a></h2>
+<p>Systematically test different controller gains:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">aiofranka</span><span class="w"> </span><span class="kn">import</span> <span class="n">RobotInterface</span><span class="p">,</span> <span class="n">FrankaController</span>
+
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">gain_tuning</span><span class="p">():</span>
+    <span class="n">robot</span> <span class="o">=</span> <span class="n">RobotInterface</span><span class="p">(</span><span class="s2">&quot;172.16.0.2&quot;</span><span class="p">)</span>
+    <span class="n">controller</span> <span class="o">=</span> <span class="n">FrankaController</span><span class="p">(</span><span class="n">robot</span><span class="p">)</span>
+
+    <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Test different gain combinations</span>
+        <span class="n">kp_values</span> <span class="o">=</span> <span class="p">[</span><span class="mi">20</span><span class="p">,</span> <span class="mi">40</span><span class="p">,</span> <span class="mi">80</span><span class="p">,</span> <span class="mi">160</span><span class="p">]</span>
+        <span class="n">kd_values</span> <span class="o">=</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">8</span><span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">kp</span> <span class="ow">in</span> <span class="n">kp_values</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">kd</span> <span class="ow">in</span> <span class="n">kd_values</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Testing kp=</span><span class="si">{</span><span class="n">kp</span><span class="si">}</span><span class="s2">, kd=</span><span class="si">{</span><span class="n">kd</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+                <span class="c1"># Move to start</span>
+                <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">move</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.57</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">1.57</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.785</span><span class="p">])</span>
+
+                <span class="c1"># Configure gains</span>
+                <span class="n">controller</span><span class="o">.</span><span class="n">switch</span><span class="p">(</span><span class="s2">&quot;impedance&quot;</span><span class="p">)</span>
+                <span class="n">controller</span><span class="o">.</span><span class="n">kp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="n">kp</span>
+                <span class="n">controller</span><span class="o">.</span><span class="n">kd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="n">kd</span>
+                <span class="n">controller</span><span class="o">.</span><span class="n">set_freq</span><span class="p">(</span><span class="mi">50</span><span class="p">)</span>
+
+                <span class="c1"># Test motion</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">):</span>
+                    <span class="n">delta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">i</span> <span class="o">/</span> <span class="mf">50.0</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
+                    <span class="n">target</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">initial_qpos</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+                    <span class="n">target</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">+=</span> <span class="n">delta</span>
+                    <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;q_desired&quot;</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>
+
+                <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">1.0</span><span class="p">)</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Gain tuning complete!&quot;</span><span class="p">)</span>
+
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">gain_tuning</span><span class="p">())</span>
+</pre></div>
+</div>
+</section>
+<section id="example-8-simulation-testing">
+<h2>Example 8: Simulation Testing<a class="headerlink" href="#example-8-simulation-testing" title="Link to this heading"></a></h2>
+<p>Test your controller in simulation before deploying to real robot:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">aiofranka</span><span class="w"> </span><span class="kn">import</span> <span class="n">RobotInterface</span><span class="p">,</span> <span class="n">FrankaController</span>
+
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">test_algorithm</span><span class="p">(</span><span class="n">robot_ip</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Test control algorithm.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        robot_ip: Robot IP address or None for simulation</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">robot</span> <span class="o">=</span> <span class="n">RobotInterface</span><span class="p">(</span><span class="n">robot_ip</span><span class="p">)</span>
+    <span class="n">controller</span> <span class="o">=</span> <span class="n">FrankaController</span><span class="p">(</span><span class="n">robot</span><span class="p">)</span>
+
+    <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Testing in </span><span class="si">{</span><span class="s1">&#39;SIMULATION&#39;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">robot_ip</span><span class="w"> </span><span class="ow">is</span><span class="w"> </span><span class="kc">None</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;REAL&#39;</span><span class="si">}</span><span class="s2"> mode&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Your control algorithm</span>
+        <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">move</span><span class="p">()</span>
+
+        <span class="n">controller</span><span class="o">.</span><span class="n">switch</span><span class="p">(</span><span class="s2">&quot;impedance&quot;</span><span class="p">)</span>
+        <span class="n">controller</span><span class="o">.</span><span class="n">kp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="mf">80.0</span>
+        <span class="n">controller</span><span class="o">.</span><span class="n">kd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="mf">4.0</span>
+        <span class="n">controller</span><span class="o">.</span><span class="n">set_freq</span><span class="p">(</span><span class="mi">50</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">):</span>
+            <span class="n">delta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">i</span> <span class="o">/</span> <span class="mf">50.0</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
+            <span class="n">target</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">initial_qpos</span> <span class="o">+</span> <span class="n">delta</span>
+            <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;q_desired&quot;</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Test successful!&quot;</span><span class="p">)</span>
+
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="c1"># First test in simulation</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">50</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Testing in simulation...&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">50</span><span class="p">)</span>
+    <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">test_algorithm</span><span class="p">(</span><span class="kc">None</span><span class="p">))</span>
+
+    <span class="c1"># Then deploy to real robot</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">50</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Testing on real robot...&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">50</span><span class="p">)</span>
+    <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">test_algorithm</span><span class="p">(</span><span class="s2">&quot;172.16.0.2&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</section>
+<section id="more-examples">
+<h2>More Examples<a class="headerlink" href="#more-examples" title="Link to this heading"></a></h2>
+<p>For more examples, check the <code class="docutils literal notranslate"><span class="pre">examples/</span></code> directory in the repository:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">01_collect_ref_traj.py</span></code>: System identification data collection</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">02_spacemouse_teleop.py</span></code>: SpaceMouse teleoperation</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">03_collect.py</span></code>: Vision-based data collection with markers</p></li>
+</ul>
+</section>
+<section id="next-steps">
+<h2>Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Review <a class="reference internal" href="controllers.html"><span class="doc">Controllers</span></a> for detailed controller documentation</p></li>
+<li><p>Check <a class="reference internal" href="safety.html"><span class="doc">Safety Guidelines</span></a> before running on real hardware</p></li>
+<li><p>Explore the <a class="reference internal" href="api/controller.html"><span class="doc">Franka Controller</span></a> for advanced features</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="quickstart.html" class="btn btn-neutral float-left" title="Quick Start" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="controllers.html" class="btn btn-neutral float-right" title="Controllers" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, MIT Improbable AI Lab.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

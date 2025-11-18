@@ -41,12 +41,30 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
+              <p class="caption" role="heading"><span class="caption-text">Getting Started:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../controllers.html">Controllers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../safety.html">Safety Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="robot.html">Robot Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="controller.html">Franka Controller</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Client</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#aiofranka.client.FrankaClient"><code class="docutils literal notranslate"><span class="pre">FrankaClient</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#aiofranka.client.FrankaClient._hostname"><code class="docutils literal notranslate"><span class="pre">FrankaClient._hostname</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aiofranka.client.FrankaClient._username"><code class="docutils literal notranslate"><span class="pre">FrankaClient._username</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aiofranka.client.FrankaClient._password"><code class="docutils literal notranslate"><span class="pre">FrankaClient._password</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aiofranka.client.FrankaClient._logged_in"><code class="docutils literal notranslate"><span class="pre">FrankaClient._logged_in</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aiofranka.client.FrankaClient._token"><code class="docutils literal notranslate"><span class="pre">FrankaClient._token</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aiofranka.client.FrankaClient._token_id"><code class="docutils literal notranslate"><span class="pre">FrankaClient._token_id</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aiofranka.client.FrankaClient.__init__"><code class="docutils literal notranslate"><span class="pre">FrankaClient.__init__()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aiofranka.client.FrankaClient.run"><code class="docutils literal notranslate"><span class="pre">FrankaClient.run()</span></code></a></li>
 </ul>
@@ -90,6 +108,10 @@
 <dt class="sig sig-object py" id="aiofranka.client.FrankaClient">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">aiofranka.client.</span></span><span class="sig-name descname"><span class="pre">FrankaClient</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hostname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">username</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">password</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">protocol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'http'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/aiofranka/client.html#FrankaClient"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aiofranka.client.FrankaClient" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/abc.html#abc.ABC" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></a></p>
+<p>Low-level client for Franka robot web interface authentication and control.</p>
+<p>This abstract base class handles login, logout, control token management,
+and shutdown operations via the robot’s HTTP/HTTPS API. Used internally
+by FrankaLockUnlock for brake control and FCI activation.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -100,19 +122,103 @@
 </ul>
 </dd>
 </dl>
-<dl class="py method">
-<dt class="sig sig-object py" id="aiofranka.client.FrankaClient.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hostname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">username</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">password</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">protocol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'http'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/aiofranka/client.html#FrankaClient.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aiofranka.client.FrankaClient.__init__" title="Link to this definition"></a></dt>
-<dd><dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>hostname</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
-<li><p><strong>username</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
-<li><p><strong>password</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
-<li><p><strong>protocol</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="aiofranka.client.FrankaClient._hostname">
+<span class="sig-name descname"><span class="pre">_hostname</span></span><a class="headerlink" href="#aiofranka.client.FrankaClient._hostname" title="Link to this definition"></a></dt>
+<dd><p>Robot hostname with protocol (<a class="reference external" href="http://">http://</a> or <a class="reference external" href="https://">https://</a>)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="aiofranka.client.FrankaClient._username">
+<span class="sig-name descname"><span class="pre">_username</span></span><a class="headerlink" href="#aiofranka.client.FrankaClient._username" title="Link to this definition"></a></dt>
+<dd><p>Admin username</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="aiofranka.client.FrankaClient._password">
+<span class="sig-name descname"><span class="pre">_password</span></span><a class="headerlink" href="#aiofranka.client.FrankaClient._password" title="Link to this definition"></a></dt>
+<dd><p>Admin password (SHA256 encoded)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="aiofranka.client.FrankaClient._logged_in">
+<span class="sig-name descname"><span class="pre">_logged_in</span></span><a class="headerlink" href="#aiofranka.client.FrankaClient._logged_in" title="Link to this definition"></a></dt>
+<dd><p>Current login state</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="aiofranka.client.FrankaClient._token">
+<span class="sig-name descname"><span class="pre">_token</span></span><a class="headerlink" href="#aiofranka.client.FrankaClient._token" title="Link to this definition"></a></dt>
+<dd><p>Active control token</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="aiofranka.client.FrankaClient._token_id">
+<span class="sig-name descname"><span class="pre">_token_id</span></span><a class="headerlink" href="#aiofranka.client.FrankaClient._token_id" title="Link to this definition"></a></dt>
+<dd><p>Active control token ID</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is an abstract class. Use FrankaLockUnlock for actual robot control.</p>
+</div>
+<dl class="simple">
+<dt>Caveats:</dt><dd><ul class="simple">
+<li><p>Only one user can have control token at a time</p></li>
+<li><p>SSL verification disabled by default (self-signed certs)</p></li>
+<li><p>Must login before requesting control token</p></li>
+<li><p>Token expires if not used within timeout period</p></li>
 </ul>
 </dd>
 </dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="aiofranka.client.FrankaClient.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hostname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">username</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">password</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">protocol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'http'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/aiofranka/client.html#FrankaClient.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aiofranka.client.FrankaClient.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize Franka client with credentials.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hostname</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Robot IP or hostname (e.g., “172.16.0.2”)</p></li>
+<li><p><strong>username</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Admin username (typically “admin”)</p></li>
+<li><p><strong>password</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Admin password</p></li>
+<li><p><strong>protocol</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – “http” or “https” (default: “http”)</p></li>
+</ul>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Password is automatically SHA256 encoded using Franka’s format.</p>
+</div>
 </dd></dl>
 
 <dl class="py method">
@@ -131,6 +237,32 @@
 <dt class="sig sig-object py" id="aiofranka.client.FrankaLockUnlock">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">aiofranka.client.</span></span><span class="sig-name descname"><span class="pre">FrankaLockUnlock</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hostname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">username</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">password</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">protocol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'https'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">relock</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/aiofranka/client.html#FrankaLockUnlock"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aiofranka.client.FrankaLockUnlock" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="#aiofranka.client.FrankaClient" title="aiofranka.client.FrankaClient"><code class="xref py py-class docutils literal notranslate"><span class="pre">FrankaClient</span></code></a></p>
+<p>High-level client for Franka robot brake control and FCI activation.</p>
+<p>This class provides methods to lock/unlock robot brakes, activate FCI
+(Franka Control Interface), and manage control tokens. Essential for
+preparing the robot before using RobotInterface.</p>
+<p>Typical workflow:
+1. Create FrankaLockUnlock instance
+2. Call run(unlock=True, fci=True, persistent=True)
+3. Use RobotInterface for control
+4. Cleanup automatically handles relock and logout</p>
+<p class="rubric">Examples</p>
+<p>Unlock and activate FCI:
+&gt;&gt;&gt; client = FrankaLockUnlock(“172.16.0.2”, “admin”, “admin”)
+&gt;&gt;&gt; client.run(unlock=True, fci=True, persistent=True)</p>
+<p>Lock robot:
+&gt;&gt;&gt; client.run(unlock=False)</p>
+<p>Request physical access (requires button press):
+&gt;&gt;&gt; client.run(unlock=True, request=True, wait=True)</p>
+<dl class="simple">
+<dt>Caveats:</dt><dd><ul class="simple">
+<li><p>Must be called before first use of RobotInterface</p></li>
+<li><p>Use persistent=True to keep token for multiple scripts</p></li>
+<li><p>relock=True automatically locks brakes on exit</p></li>
+<li><p>Physical access requires pressing button on robot</p></li>
+</ul>
+</dd>
+</dl>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -145,17 +277,25 @@
 <dl class="py method">
 <dt class="sig sig-object py" id="aiofranka.client.FrankaLockUnlock.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hostname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">username</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">password</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">protocol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'https'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">relock</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/aiofranka/client.html#FrankaLockUnlock.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aiofranka.client.FrankaLockUnlock.__init__" title="Link to this definition"></a></dt>
-<dd><dl class="field-list simple">
+<dd><p>Initialize lock/unlock client.</p>
+<dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>hostname</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
-<li><p><strong>username</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
-<li><p><strong>password</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
-<li><p><strong>protocol</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
-<li><p><strong>relock</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>hostname</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Robot IP address (e.g., “172.16.0.2”)</p></li>
+<li><p><strong>username</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Admin username (default: “admin”)</p></li>
+<li><p><strong>password</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Admin password</p></li>
+<li><p><strong>protocol</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – “http” or “https” (default: “https”)</p></li>
+<li><p><strong>relock</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>) – Automatically lock brakes on exit (default: False)</p></li>
 </ul>
 </dd>
 </dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>Cleanup handler registered automatically via atexit</p></li>
+<li><p>relock=True is useful for safety but may be unwanted in scripts</p></li>
+</ul>
+</div>
 </dd></dl>
 
 <dl class="py method">

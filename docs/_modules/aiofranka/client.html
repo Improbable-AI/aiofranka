@@ -90,9 +90,45 @@
 <div class="viewcode-block" id="FrankaClient">
 <a class="viewcode-back" href="../../api/client.html#aiofranka.client.FrankaClient">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">FrankaClient</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Low-level client for Franka robot web interface authentication and control.</span>
+<span class="sd">    </span>
+<span class="sd">    This abstract base class handles login, logout, control token management,</span>
+<span class="sd">    and shutdown operations via the robot&#39;s HTTP/HTTPS API. Used internally</span>
+<span class="sd">    by FrankaLockUnlock for brake control and FCI activation.</span>
+<span class="sd">    </span>
+<span class="sd">    Attributes:</span>
+<span class="sd">        _hostname (str): Robot hostname with protocol (http:// or https://)</span>
+<span class="sd">        _username (str): Admin username</span>
+<span class="sd">        _password (str): Admin password (SHA256 encoded)</span>
+<span class="sd">        _logged_in (bool): Current login state</span>
+<span class="sd">        _token (str): Active control token</span>
+<span class="sd">        _token_id (int): Active control token ID</span>
+<span class="sd">        </span>
+<span class="sd">    Note:</span>
+<span class="sd">        This is an abstract class. Use FrankaLockUnlock for actual robot control.</span>
+<span class="sd">        </span>
+<span class="sd">    Caveats:</span>
+<span class="sd">        - Only one user can have control token at a time</span>
+<span class="sd">        - SSL verification disabled by default (self-signed certs)</span>
+<span class="sd">        - Must login before requesting control token</span>
+<span class="sd">        - Token expires if not used within timeout period</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 <div class="viewcode-block" id="FrankaClient.__init__">
 <a class="viewcode-back" href="../../api/client.html#aiofranka.client.FrankaClient.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hostname</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">username</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">password</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">protocol</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;http&#39;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize Franka client with credentials.</span>
+<span class="sd">        </span>
+<span class="sd">        Args:</span>
+<span class="sd">            hostname (str): Robot IP or hostname (e.g., &quot;172.16.0.2&quot;)</span>
+<span class="sd">            username (str): Admin username (typically &quot;admin&quot;)</span>
+<span class="sd">            password (str): Admin password</span>
+<span class="sd">            protocol (str): &quot;http&quot; or &quot;https&quot; (default: &quot;http&quot;)</span>
+<span class="sd">            </span>
+<span class="sd">        Note:</span>
+<span class="sd">            Password is automatically SHA256 encoded using Franka&#39;s format.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">requests</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">urllib3</span><span class="o">.</span><span class="n">disable_warnings</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_session</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">verify</span> <span class="o">=</span> <span class="kc">False</span>
@@ -189,9 +225,53 @@
 <div class="viewcode-block" id="FrankaLockUnlock">
 <a class="viewcode-back" href="../../api/client.html#aiofranka.client.FrankaLockUnlock">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">FrankaLockUnlock</span><span class="p">(</span><span class="n">FrankaClient</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    High-level client for Franka robot brake control and FCI activation.</span>
+<span class="sd">    </span>
+<span class="sd">    This class provides methods to lock/unlock robot brakes, activate FCI</span>
+<span class="sd">    (Franka Control Interface), and manage control tokens. Essential for</span>
+<span class="sd">    preparing the robot before using RobotInterface.</span>
+<span class="sd">    </span>
+<span class="sd">    Typical workflow:</span>
+<span class="sd">    1. Create FrankaLockUnlock instance</span>
+<span class="sd">    2. Call run(unlock=True, fci=True, persistent=True)</span>
+<span class="sd">    3. Use RobotInterface for control</span>
+<span class="sd">    4. Cleanup automatically handles relock and logout</span>
+<span class="sd">    </span>
+<span class="sd">    Examples:</span>
+<span class="sd">        Unlock and activate FCI:</span>
+<span class="sd">        &gt;&gt;&gt; client = FrankaLockUnlock(&quot;172.16.0.2&quot;, &quot;admin&quot;, &quot;admin&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; client.run(unlock=True, fci=True, persistent=True)</span>
+<span class="sd">        </span>
+<span class="sd">        Lock robot:</span>
+<span class="sd">        &gt;&gt;&gt; client.run(unlock=False)</span>
+<span class="sd">        </span>
+<span class="sd">        Request physical access (requires button press):</span>
+<span class="sd">        &gt;&gt;&gt; client.run(unlock=True, request=True, wait=True)</span>
+<span class="sd">        </span>
+<span class="sd">    Caveats:</span>
+<span class="sd">        - Must be called before first use of RobotInterface</span>
+<span class="sd">        - Use persistent=True to keep token for multiple scripts</span>
+<span class="sd">        - relock=True automatically locks brakes on exit</span>
+<span class="sd">        - Physical access requires pressing button on robot</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 <div class="viewcode-block" id="FrankaLockUnlock.__init__">
 <a class="viewcode-back" href="../../api/client.html#aiofranka.client.FrankaLockUnlock.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hostname</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">username</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">password</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">protocol</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;https&#39;</span><span class="p">,</span> <span class="n">relock</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize lock/unlock client.</span>
+<span class="sd">        </span>
+<span class="sd">        Args:</span>
+<span class="sd">            hostname (str): Robot IP address (e.g., &quot;172.16.0.2&quot;)</span>
+<span class="sd">            username (str): Admin username (default: &quot;admin&quot;)</span>
+<span class="sd">            password (str): Admin password</span>
+<span class="sd">            protocol (str): &quot;http&quot; or &quot;https&quot; (default: &quot;https&quot;)</span>
+<span class="sd">            relock (bool): Automatically lock brakes on exit (default: False)</span>
+<span class="sd">            </span>
+<span class="sd">        Note:</span>
+<span class="sd">            - Cleanup handler registered automatically via atexit</span>
+<span class="sd">            - relock=True is useful for safety but may be unwanted in scripts</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">hostname</span><span class="p">,</span> <span class="n">username</span><span class="p">,</span> <span class="n">password</span><span class="p">,</span> <span class="n">protocol</span><span class="o">=</span><span class="n">protocol</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_relock</span> <span class="o">=</span> <span class="n">relock</span>
         <span class="n">atexit</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_cleanup</span><span class="p">)</span></div>

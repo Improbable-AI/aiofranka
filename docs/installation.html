@@ -1,0 +1,329 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Installation &mdash; aiofranka 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=01f34227"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Quick Start" href="quickstart.html" />
+    <link rel="prev" title="Welcome to aiofranka’s documentation!" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            aiofranka
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#prerequisites">Prerequisites</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#python-version">Python Version</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#system-requirements">System Requirements</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#dependencies">Dependencies</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#required-dependencies">Required Dependencies</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#optional-dependencies">Optional Dependencies</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#installing-aiofranka">Installing aiofranka</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#from-pypi-recommended">From PyPI (Recommended)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#from-source">From Source</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#development-installation">Development Installation</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#verifying-installation">Verifying Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#first-time-robot-setup">First-Time Robot Setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#troubleshooting">Troubleshooting</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#common-issues">Common Issues</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#getting-help">Getting Help</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#next-steps">Next Steps</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="controllers.html">Controllers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="safety.html">Safety Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api/robot.html">Robot Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/controller.html">Franka Controller</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/client.html">Client</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">aiofranka</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Installation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/installation.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="installation">
+<h1>Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h1>
+<section id="prerequisites">
+<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading"></a></h2>
+<section id="python-version">
+<h3>Python Version<a class="headerlink" href="#python-version" title="Link to this heading"></a></h3>
+<p>aiofranka requires Python 3.8 or later.</p>
+</section>
+<section id="system-requirements">
+<h3>System Requirements<a class="headerlink" href="#system-requirements" title="Link to this heading"></a></h3>
+<p>For controlling a real robot:</p>
+<ul class="simple">
+<li><p>Linux operating system (Ubuntu 20.04+ recommended)</p></li>
+<li><p>Real-time kernel (optional but recommended for best performance)</p></li>
+<li><p>Network connection to Franka robot (&lt; 1ms latency)</p></li>
+</ul>
+<p>For simulation only:</p>
+<ul class="simple">
+<li><p>Any OS supported by MuJoCo (Linux, macOS, Windows)</p></li>
+</ul>
+</section>
+</section>
+<section id="dependencies">
+<h2>Dependencies<a class="headerlink" href="#dependencies" title="Link to this heading"></a></h2>
+<section id="required-dependencies">
+<h3>Required Dependencies<a class="headerlink" href="#required-dependencies" title="Link to this heading"></a></h3>
+<p>The following packages are automatically installed with aiofranka:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">numpy</span></code>: Numerical computations</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">scipy</span></code>: Spatial transformations</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">requests</span></code>: HTTP client for robot API</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">asyncio</span></code>: Asynchronous programming (Python stdlib)</p></li>
+</ul>
+</section>
+<section id="optional-dependencies">
+<h3>Optional Dependencies<a class="headerlink" href="#optional-dependencies" title="Link to this heading"></a></h3>
+<p>For real robot control:</p>
+<p><strong>libfranka and pylibfranka</strong> (Required)</p>
+<p>Follow the official instructions to install libfranka and pylibfranka:</p>
+<ol class="arabic">
+<li><p>Install libfranka from source or packages:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Ubuntu/Debian</span>
+sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>libfranka-dev
+
+<span class="c1"># Or build from source</span>
+git<span class="w"> </span>clone<span class="w"> </span>--recursive<span class="w"> </span>https://github.com/frankaemika/libfranka.git
+<span class="nb">cd</span><span class="w"> </span>libfranka
+mkdir<span class="w"> </span>build<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>build
+cmake<span class="w"> </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>Release<span class="w"> </span>..
+make<span class="w"> </span>-j4
+sudo<span class="w"> </span>make<span class="w"> </span>install
+</pre></div>
+</div>
+</li>
+<li><p>Install pylibfranka:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>pylibfranka
+</pre></div>
+</div>
+</li>
+</ol>
+<p><strong>MuJoCo</strong> (Required)</p>
+<p>Install MuJoCo for kinematics and dynamics:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>mujoco
+</pre></div>
+</div>
+<p><strong>Ruckig</strong> (Required for trajectory generation)</p>
+<p>Install Ruckig for smooth trajectory planning:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>ruckig
+</pre></div>
+</div>
+<p>For teleoperation examples:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>pyspacemouse
+</pre></div>
+</div>
+</section>
+</section>
+<section id="installing-aiofranka">
+<h2>Installing aiofranka<a class="headerlink" href="#installing-aiofranka" title="Link to this heading"></a></h2>
+<section id="from-pypi-recommended">
+<h3>From PyPI (Recommended)<a class="headerlink" href="#from-pypi-recommended" title="Link to this heading"></a></h3>
+<p>Install the latest stable release:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>aiofranka
+</pre></div>
+</div>
+</section>
+<section id="from-source">
+<h3>From Source<a class="headerlink" href="#from-source" title="Link to this heading"></a></h3>
+<p>For development or to get the latest features:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/Improbable-AI/aiofranka.git
+<span class="nb">cd</span><span class="w"> </span>aiofranka
+pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
+</pre></div>
+</div>
+</section>
+<section id="development-installation">
+<h3>Development Installation<a class="headerlink" href="#development-installation" title="Link to this heading"></a></h3>
+<p>To contribute to aiofranka:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/Improbable-AI/aiofranka.git
+<span class="nb">cd</span><span class="w"> </span>aiofranka
+pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[dev]&quot;</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="verifying-installation">
+<h2>Verifying Installation<a class="headerlink" href="#verifying-installation" title="Link to this heading"></a></h2>
+<p>Test your installation:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">aiofranka</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">aiofranka</span><span class="o">.</span><span class="n">__version__</span><span class="p">)</span>
+
+<span class="c1"># Test simulation mode (no robot required)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">aiofranka</span><span class="w"> </span><span class="kn">import</span> <span class="n">RobotInterface</span>
+<span class="n">robot</span> <span class="o">=</span> <span class="n">RobotInterface</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>  <span class="c1"># None = simulation</span>
+<span class="n">state</span> <span class="o">=</span> <span class="n">robot</span><span class="o">.</span><span class="n">state</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Joint positions: </span><span class="si">{</span><span class="n">state</span><span class="p">[</span><span class="s1">&#39;qpos&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>If this runs without errors, you’re ready to go!</p>
+</section>
+<section id="first-time-robot-setup">
+<h2>First-Time Robot Setup<a class="headerlink" href="#first-time-robot-setup" title="Link to this heading"></a></h2>
+<p>Before using aiofranka with a real robot, you need to unlock the brakes and activate FCI:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">aiofranka.client</span><span class="w"> </span><span class="kn">import</span> <span class="n">FrankaLockUnlock</span>
+
+<span class="n">client</span> <span class="o">=</span> <span class="n">FrankaLockUnlock</span><span class="p">(</span>
+    <span class="n">hostname</span><span class="o">=</span><span class="s2">&quot;172.16.0.2&quot;</span><span class="p">,</span>  <span class="c1"># Your robot&#39;s IP</span>
+    <span class="n">username</span><span class="o">=</span><span class="s2">&quot;admin&quot;</span><span class="p">,</span>
+    <span class="n">password</span><span class="o">=</span><span class="s2">&quot;admin&quot;</span>
+<span class="p">)</span>
+
+<span class="c1"># Unlock brakes and activate FCI</span>
+<span class="n">client</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">unlock</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">fci</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">persistent</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>You only need to do this once per power cycle unless another user takes control.</p>
+</div>
+</section>
+<section id="troubleshooting">
+<h2>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Link to this heading"></a></h2>
+<section id="common-issues">
+<h3>Common Issues<a class="headerlink" href="#common-issues" title="Link to this heading"></a></h3>
+<p><strong>ImportError: No module named ‘pylibfranka’</strong></p>
+<p>Solution: pylibfranka must be installed manually. See instructions above.</p>
+<p><strong>ImportError: No module named ‘mujoco’</strong></p>
+<p>Solution: Install MuJoCo:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>mujoco
+</pre></div>
+</div>
+<p><strong>ConnectionError when connecting to robot</strong></p>
+<p>Solution:</p>
+<ol class="arabic simple">
+<li><p>Check network connection: <code class="docutils literal notranslate"><span class="pre">ping</span> <span class="pre">172.16.0.2</span></code></p></li>
+<li><p>Ensure robot is powered on and in FCI mode</p></li>
+<li><p>Check firewall settings</p></li>
+<li><p>Verify no other program has control token</p></li>
+</ol>
+<p><strong>ModuleNotFoundError: No module named ‘ruckig’</strong></p>
+<p>Solution: Install Ruckig:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>ruckig
+</pre></div>
+</div>
+</section>
+<section id="getting-help">
+<h3>Getting Help<a class="headerlink" href="#getting-help" title="Link to this heading"></a></h3>
+<p>If you encounter issues not covered here:</p>
+<ol class="arabic simple">
+<li><p>Check the <a class="reference external" href="https://github.com/Improbable-AI/aiofranka/issues">GitHub Issues</a></p></li>
+<li><p>Consult the <a class="reference internal" href="troubleshooting.html"><span class="doc">Troubleshooting</span></a> guide</p></li>
+<li><p>Open a new issue with details about your problem</p></li>
+</ol>
+</section>
+</section>
+<section id="next-steps">
+<h2>Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Read the <a class="reference internal" href="quickstart.html"><span class="doc">Quick Start</span></a> guide</p></li>
+<li><p>Explore <a class="reference internal" href="examples.html"><span class="doc">Examples</span></a></p></li>
+<li><p>Review <a class="reference internal" href="safety.html"><span class="doc">Safety Guidelines</span></a> guidelines before controlling a real robot</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Welcome to aiofranka’s documentation!" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="quickstart.html" class="btn btn-neutral float-right" title="Quick Start" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, MIT Improbable AI Lab.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

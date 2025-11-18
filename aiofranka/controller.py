@@ -18,14 +18,95 @@ CUR_DIR = Path(__file__).parent.resolve()
 
 
 class FrankaController: 
+    """
+    High-level asyncio controller for Franka robots with multiple control modes.
+    
+    This controller runs a 1kHz torque control loop in the background using asyncio,
+    while allowing you to send high-level commands asynchronously. Supports three
+    control modes:
+    
+    1. Impedance Control: Joint-space spring-damper control
+    2. Operational Space Control (OSC): Task-space control with null-space
+    3. Direct Torque Control: Raw torque commands
+    
+    The controller automatically handles:
+    - Background control loop at 1kHz
+    - Torque rate limiting for safety
+    - Thread-safe state updates
+    - Rate-limited command updates
+    - Smooth trajectory generation
+    
+    Attributes:
+        robot (RobotInterface): Robot interface instance
+        type (str): Current controller type ("impedance", "osc", "torque")
+        running (bool): Whether control loop is active
+        state (dict): Current robot state (updated at 1kHz)
+        
+        # Impedance control gains
+        kp (np.ndarray): Joint position stiffness [Nm/rad] (7,)
+        kd (np.ndarray): Joint damping [Nm⋅s/rad] (7,)
+        
+        # OSC gains
+        ee_kp (np.ndarray): EE stiffness [N/m for xyz, Nm/rad for rpy] (6,)
+        ee_kd (np.ndarray): EE damping [N⋅s/m for xyz, Nm⋅s/rad for rpy] (6,)
+        null_kp (np.ndarray): Null-space stiffness [Nm/rad] (7,)
+        null_kd (np.ndarray): Null-space damping [Nm⋅s/rad] (7,)
+        
+        # Target states
+        q_desired (np.ndarray): Desired joint positions [rad] (7,)
+        ee_desired (np.ndarray): Desired EE pose as 4x4 transform
+        torque (np.ndarray): Direct torque command [Nm] (7,)
+        
+        # Safety
+        clip (bool): Enable torque rate limiting (default: True)
+        torque_diff_limit (float): Max torque rate [Nm/s] (default: 990)
+        
+    Examples:
+        Basic usage:
+            >>> robot = RobotInterface("172.16.0.2")
+            >>> controller = FrankaController(robot)
+            >>> await controller.start()
+            >>> controller.switch("impedance")
+            >>> controller.set_freq(50)
+            >>> await controller.set("q_desired", target_joints)
+            >>> await controller.stop()
+        
+        OSC control:
+            >>> controller.switch("osc")
+            >>> controller.ee_kp = np.array([300, 300, 300, 1000, 1000, 1000])
+            >>> controller.set_freq(50)
+            >>> desired_ee = np.eye(4)
+            >>> desired_ee[:3, 3] = [0.4, 0.0, 0.5]
+            >>> await controller.set("ee_desired", desired_ee)
+        
+        Direct torque:
+            >>> controller.switch("torque")
+            >>> controller.torque = np.zeros(7)  # Zero torques
+        
+    Caveats:
+        - Must await controller.start() before sending commands
+        - Use set_freq() before set() to enforce timing
+        - High gains can cause instability or safety triggers
+        - Switching controllers resets initial state
+        - State access is thread-safe but copy if modifying
+        - Control loop must run continuously at ~1kHz
+    """
 
     def __init__(self, robot: RobotInterface):
         """
-        Initialize Impedance Controller with pre-initialized resources.
+        Initialize controller with robot interface.
         
         Args:
-            robot: pylibfranka Robot instance
-            model: pylibfranka Model for dynamics computation
+            robot (RobotInterface): Initialized robot interface
+            
+        Note:
+            Controller is initialized in "impedance" mode with conservative gains.
+            Call start() to begin the control loop, then switch() to change modes.
+            
+        Default Gains:
+            - Impedance: kp=80, kd=4 (per joint)
+            - OSC: ee_kp=[100]*6, ee_kd=[4]*6
+            - Null-space: null_kp=1, null_kd=1
         """
         self.robot = robot
 
@@ -55,6 +136,28 @@ class FrankaController:
 
 
     async def test_connection(self): 
+        """
+        Test control loop timing and diagnose connection quality.
+        
+        Runs for 5 seconds and prints statistics about control loop performance:
+        - Actual frequency (should be ~1000 Hz)
+        - Mean/std/min/max loop time
+        - Jitter (max - min)
+        
+        Use this to verify your setup is working correctly before running experiments.
+        
+        Example Output:
+            Control loop stats (last 1000 iterations):
+              Frequency: 1000.2 Hz (target: 1000 Hz)
+              Mean dt: 1.000 ms, Std: 0.015 ms
+              Min dt: 0.985 ms, Max dt: 1.025 ms
+              Jitter (max-min): 0.040 ms
+              
+        Caveats:
+            - High jitter (>0.5ms) indicates system load or network issues
+            - Frequency <990 Hz suggests performance problems
+            - Run on a dedicated realtime system for best results
+        """
 
         self.track = True 
         await asyncio.sleep(5)
@@ -86,23 +189,77 @@ class FrankaController:
             self.q_desired = np.array(desired) if type(desired) == list else desired
     
     def set_freq(self, freq: float):
-        """Set the update frequency for rate-limited setters.
+        """
+        Set the update frequency for rate-limited set() calls.
+        
+        This enforces strict timing for subsequent set() calls, automatically
+        sleeping to maintain the specified frequency. Prevents sending commands
+        too fast and ensures smooth, consistent control.
         
         Args:
-            freq: Desired update frequency in Hz
+            freq (float): Desired update frequency in Hz (typically 10-100 Hz)
+            
+        Note:
+            Must be called BEFORE the first set() call to take effect.
+            Each attribute tracked by set() has independent timing.
+            
+        Examples:
+            >>> controller.set_freq(50)  # 50 Hz updates
+            >>> for i in range(100):
+            ...     await controller.set("q_desired", compute_target())
+            ...     # Automatically sleeps to maintain 50 Hz
+            
+        Caveats:
+            - Don't set freq > 200 Hz (unnecessary and may cause timing issues)
+            - Lower freq = smoother motion but slower response
+            - Higher freq = faster response but requires more computation
+            - Timing is per-attribute (q_desired and ee_desired tracked separately)
         """
         self._update_freq = freq
     
     async def set(self, attr: str, value):
-        """Rate-limited setter that enforces strict timing.
+        """
+        Rate-limited setter that enforces strict timing for control updates.
         
         This method ensures updates to controller attributes happen at the
         frequency specified by set_freq(). It compensates for drift by tracking
-        the target time for each update.
+        the target time for each update, guaranteeing consistent timing even
+        if your computation time varies.
         
         Args:
-            attr: Attribute name (e.g., 'q_desired', 'ee_desired')
-            value: Value to set
+            attr (str): Attribute name to set. Common values:
+                       - "q_desired": Joint position target (impedance mode)
+                       - "ee_desired": End-effector pose target (OSC mode)
+                       - "torque": Direct torque command (torque mode)
+            value: Value to set. Type depends on attr:
+                  - q_desired: np.ndarray (7,) [rad]
+                  - ee_desired: np.ndarray (4, 4) homogeneous transform
+                  - torque: np.ndarray (7,) [Nm]
+                  
+        Note:
+            - Automatically sleeps to maintain frequency set by set_freq()
+            - First call for an attribute initializes timing
+            - Each attribute has independent timing tracking
+            - Thread-safe update of shared state
+            
+        Examples:
+            Impedance control:
+                >>> controller.set_freq(50)
+                >>> for i in range(100):
+                ...     target = initial_q + np.sin(i / 50.0 * np.pi) * 0.1
+                ...     await controller.set("q_desired", target)
+            
+            OSC control:
+                >>> controller.set_freq(100)
+                >>> desired_ee = np.eye(4)
+                >>> desired_ee[:3, 3] = [0.5, 0.0, 0.3]
+                >>> await controller.set("ee_desired", desired_ee)
+            
+        Caveats:
+            - Must call set_freq() before first set() call
+            - If computation takes longer than 1/freq, timing will slip
+            - Don't mix set() and direct attribute assignment
+            - Don't call set() faster than the specified frequency
         """
         current_time = time.perf_counter()
         dt = 1.0 / self._update_freq
@@ -191,7 +348,35 @@ class FrankaController:
             sys.exit(1)  # Kill the entire script
     
     async def start(self):
-        """Start the background control loop"""
+        """
+        Start the 1kHz background control loop.
+        
+        This creates an asyncio task that runs the control loop continuously
+        at ~1000 Hz. The loop reads robot state, computes control torques based
+        on the current controller type, and sends torque commands.
+        
+        Returns:
+            asyncio.Task: The background control loop task
+            
+        Note:
+            - Blocks for 1 second to ensure loop starts successfully
+            - Starts robot torque control mode automatically
+            - Control loop runs until stop() is called
+            - You can send commands via set() while loop is running
+            
+        Example:
+            >>> await controller.start()
+            >>> # Control loop now running in background
+            >>> controller.set_freq(50)
+            >>> await controller.set("q_desired", target)
+            >>> await controller.stop()
+            
+        Caveats:
+            - Must be awaited (async function)
+            - Don't call start() multiple times without stop()
+            - If loop crashes, robot will trigger safety stop
+            - Check terminal for error messages if robot stops unexpectedly
+        """
 
         print("starting robot!")
         self.robot.start()
@@ -202,7 +387,27 @@ class FrankaController:
         return self.task
     
     async def stop(self):
-        """Stop the background control loop"""
+        """
+        Stop the background control loop and robot.
+        
+        Gracefully terminates the control loop task and stops robot torque control.
+        Robot will hold position briefly then release brakes.
+        
+        Note:
+            - Blocks for 1 second to ensure clean shutdown
+            - Cancels asyncio control loop task
+            - Stops robot torque control mode
+            - Safe to call multiple times
+            
+        Example:
+            >>> await controller.start()
+            >>> # ... do control ...
+            >>> await controller.stop()
+            
+        Caveat:
+            Ensure robot is in a safe configuration before stopping. Robot
+            will briefly hold position then release brakes.
+        """
         self.running = False
         if self.task:
             self.task.cancel()
@@ -216,6 +421,39 @@ class FrankaController:
         await asyncio.sleep(1)  # Yield to ensure the task starts
 
     def switch(self, controller_type: str):
+        """
+        Switch between control modes at runtime.
+        
+        Changes the active controller without stopping the control loop. Resets
+        the initial state (initial_qpos, initial_ee) to current robot state and
+        clears rate-limiting timing.
+        
+        Args:
+            controller_type (str): Controller type to switch to:
+                - "impedance": Joint-space impedance control
+                - "osc": Operational space control (task space)
+                - "torque": Direct torque control
+                
+        Example:
+            >>> controller.switch("impedance")
+            >>> controller.kp = np.ones(7) * 80
+            >>> # ... run impedance control ...
+            >>> 
+            >>> controller.switch("osc")
+            >>> controller.ee_kp = np.array([300, 300, 300, 1000, 1000, 1000])
+            >>> # ... run OSC control ...
+            
+        Note:
+            - Can be called while control loop is running
+            - Resets q_desired to current position
+            - Resets ee_desired to current end-effector pose
+            - Clears timing state from previous set() calls
+            
+        Caveats:
+            - Switching causes brief discontinuity in control
+            - Adjust gains after switching for smooth transition
+            - Don't switch rapidly (< 1 Hz) as it resets state
+        """
         self.type = controller_type
         self.initialize()
         # Reset timing state when switching controllers
@@ -328,6 +566,48 @@ class FrankaController:
 
 
     async def move(self, qpos = [0, 0, 0.0, -1.57079, 0, 1.57079, -0.7853]):
+        """
+        Move robot to target joint position using smooth trajectory.
+        
+        Generates a time-optimal, jerk-limited trajectory using Ruckig online
+        trajectory generation, then executes it at 50 Hz. Automatically switches
+        to impedance mode if not already active.
+        
+        Args:
+            qpos (list | np.ndarray): Target joint positions [rad] (7,)
+                                     Default: Home position
+                                     
+        Note:
+            - Uses Ruckig for smooth, time-optimal trajectories
+            - Respects velocity, acceleration, and jerk limits
+            - Switches to impedance control automatically
+            - Executes trajectory at 50 Hz (20ms updates)
+            - Duration depends on distance and limits
+            
+        Trajectory Limits:
+            - Max velocity: 10 rad/s per joint
+            - Max acceleration: 5 rad/s² per joint
+            - Max jerk: 1 rad/s³ per joint
+            
+        Examples:
+            Move to home position:
+                >>> await controller.move()
+            
+            Move to custom position:
+                >>> target = [0, -0.785, 0, -2.356, 0, 1.571, 0.785]
+                >>> await controller.move(target)
+            
+            Move to current position + offset:
+                >>> current = controller.state['qpos']
+                >>> await controller.move(current + np.array([0.1, 0, 0, 0, 0, 0, 0]))
+                
+        Caveats:
+            - Large motions take longer (trajectory is time-optimal)
+            - Don't call while other control is active
+            - Blocks until motion completes
+            - Switches to impedance mode (resets controller state)
+            - May fail if target is at joint limits or in collision
+        """
         self.type = "impedance"
 
         inp = InputParameter(7)

@@ -15,7 +15,43 @@ from http import HTTPStatus
 
 
 class FrankaClient(ABC):
+    """
+    Low-level client for Franka robot web interface authentication and control.
+    
+    This abstract base class handles login, logout, control token management,
+    and shutdown operations via the robot's HTTP/HTTPS API. Used internally
+    by FrankaLockUnlock for brake control and FCI activation.
+    
+    Attributes:
+        _hostname (str): Robot hostname with protocol (http:// or https://)
+        _username (str): Admin username
+        _password (str): Admin password (SHA256 encoded)
+        _logged_in (bool): Current login state
+        _token (str): Active control token
+        _token_id (int): Active control token ID
+        
+    Note:
+        This is an abstract class. Use FrankaLockUnlock for actual robot control.
+        
+    Caveats:
+        - Only one user can have control token at a time
+        - SSL verification disabled by default (self-signed certs)
+        - Must login before requesting control token
+        - Token expires if not used within timeout period
+    """
     def __init__(self, hostname: str, username: str, password: str, protocol: str = 'http'):
+        """
+        Initialize Franka client with credentials.
+        
+        Args:
+            hostname (str): Robot IP or hostname (e.g., "172.16.0.2")
+            username (str): Admin username (typically "admin")
+            password (str): Admin password
+            protocol (str): "http" or "https" (default: "http")
+            
+        Note:
+            Password is automatically SHA256 encoded using Franka's format.
+        """
         requests.packages.urllib3.disable_warnings()
         self._session = requests.Session()
         self._session.verify = False
@@ -105,7 +141,51 @@ class FrankaClient(ABC):
 
 
 class FrankaLockUnlock(FrankaClient):
+    """
+    High-level client for Franka robot brake control and FCI activation.
+    
+    This class provides methods to lock/unlock robot brakes, activate FCI
+    (Franka Control Interface), and manage control tokens. Essential for
+    preparing the robot before using RobotInterface.
+    
+    Typical workflow:
+    1. Create FrankaLockUnlock instance
+    2. Call run(unlock=True, fci=True, persistent=True)
+    3. Use RobotInterface for control
+    4. Cleanup automatically handles relock and logout
+    
+    Examples:
+        Unlock and activate FCI:
+        >>> client = FrankaLockUnlock("172.16.0.2", "admin", "admin")
+        >>> client.run(unlock=True, fci=True, persistent=True)
+        
+        Lock robot:
+        >>> client.run(unlock=False)
+        
+        Request physical access (requires button press):
+        >>> client.run(unlock=True, request=True, wait=True)
+        
+    Caveats:
+        - Must be called before first use of RobotInterface
+        - Use persistent=True to keep token for multiple scripts
+        - relock=True automatically locks brakes on exit
+        - Physical access requires pressing button on robot
+    """
     def __init__(self, hostname: str, username: str, password: str, protocol: str = 'https', relock: bool = False):
+        """
+        Initialize lock/unlock client.
+        
+        Args:
+            hostname (str): Robot IP address (e.g., "172.16.0.2")
+            username (str): Admin username (default: "admin")
+            password (str): Admin password
+            protocol (str): "http" or "https" (default: "https")
+            relock (bool): Automatically lock brakes on exit (default: False)
+            
+        Note:
+            - Cleanup handler registered automatically via atexit
+            - relock=True is useful for safety but may be unwanted in scripts
+        """
         super().__init__(hostname, username, password, protocol=protocol)
         self._relock = relock
         atexit.register(self._cleanup)
