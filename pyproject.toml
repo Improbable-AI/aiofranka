@@ -27,12 +27,6 @@ dependencies = [
     "scipy",
 ]
 
-[project.optional-dependencies]
-docs = [
-    "sphinx>=5.0",
-    "sphinx-rtd-theme>=1.0",
-]
-
 [project.urls]
 Homepage = "https://github.com/Improbable-AI/franka-server"
 Repository = "https://github.com/Improbable-AI/franka-server"
