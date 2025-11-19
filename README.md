@@ -16,6 +16,9 @@
 
 The library is designed for research applications requiring precise, real-time control with minimal latency and maximum flexibility.
 
+📚 **[Documentation](https://improbableai.com/aiofranka)**
+
+
 
 ## Installation
 
@@ -173,23 +176,6 @@ await controller.set("ee_desired", desired_ee)
 ```
 
 **Use case**: Cartesian trajectories, end-effector tracking
-
-
-### 3. Direct Torque Control
-
-Send raw joint torques:
-
-```python
-controller.switch("torque")
-controller.torque = np.array([0, 0, 0, 0, 0, 0, 0])  # Direct torque commands
-```
-
-**Use case**: Custom control algorithms, learning-based control
-
-**Note**:
-- ⚠️ **Most dangerous mode** - no built-in safety
-- Torque rate limiting is still active by default
-- Test in simulation first!
 
 
 
