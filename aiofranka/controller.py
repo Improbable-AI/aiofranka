@@ -136,6 +136,8 @@ class FrankaController:
 
         self.state = None 
 
+        self.verbose = False
+
 
     async def test_connection(self): 
         """
@@ -464,6 +466,11 @@ class FrankaController:
         self.error_integral = np.zeros(7)
         # Reset timing state when switching controllers
         self._last_update_time.clear()
+
+        if self.verbose:
+            print("==================================")
+            print(f"Switched to {controller_type} controller.")
+            print("==================================")
 
     def step(self): 
         self.state = self.robot.state
