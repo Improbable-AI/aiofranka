@@ -39,11 +39,17 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
+              <p class="caption" role="heading"><span class="caption-text">Getting Started:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../controllers.html">Controllers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../api/robot.html">Robot Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../api/controller.html">Franka Controller</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../api/client.html">Client</a></li>
 </ul>
 
         </div>
@@ -197,6 +203,8 @@
 
 
         <span class="bp">self</span><span class="o">.</span><span class="n">kp</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">kd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="mi">80</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="mi">4</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ki</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>  <span class="c1"># Integral gains</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">error_integral</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span>  <span class="c1"># Accumulated error</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">ee_kp</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ee_kd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">6</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">6</span><span class="p">)</span> <span class="o">*</span> <span class="mi">4</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">null_kp</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">null_kd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="mi">1</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="mi">1</span>
 
@@ -529,6 +537,7 @@
 <span class="sd">        Args:</span>
 <span class="sd">            controller_type (str): Controller type to switch to:</span>
 <span class="sd">                - &quot;impedance&quot;: Joint-space impedance control</span>
+<span class="sd">                - &quot;pid&quot;: Joint-space PID control with integral term</span>
 <span class="sd">                - &quot;osc&quot;: Operational space control (task space)</span>
 <span class="sd">                - &quot;torque&quot;: Direct torque control</span>
 <span class="sd">                </span>
@@ -546,6 +555,7 @@
 <span class="sd">            - Resets q_desired to current position</span>
 <span class="sd">            - Resets ee_desired to current end-effector pose</span>
 <span class="sd">            - Clears timing state from previous set() calls</span>
+<span class="sd">            - Resets integral term when switching to/from PID</span>
 <span class="sd">            </span>
 <span class="sd">        Caveats:</span>
 <span class="sd">            - Switching causes brief discontinuity in control</span>
@@ -554,6 +564,8 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">=</span> <span class="n">controller_type</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">initialize</span><span class="p">()</span>
+        <span class="c1"># Reset integral term when switching controllers</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">error_integral</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span>
         <span class="c1"># Reset timing state when switching controllers</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_last_update_time</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span></div>
 
@@ -564,6 +576,8 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">robot</span><span class="o">.</span><span class="n">state</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">&quot;impedance&quot;</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_impedance_step</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">&quot;pid&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_pid_step</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="p">)</span>
         <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">&quot;osc&quot;</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_osc_step</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="p">)</span>
         <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">&quot;torque&quot;</span><span class="p">:</span>
@@ -632,6 +646,49 @@
 
     
 
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_pid_step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">robot_state</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        PID control in joint space with integral term for steady-state error.</span>
+<span class="sd">        </span>
+<span class="sd">        Computes: τ = Kp*e + Ki*∫e*dt - Kd*dq</span>
+<span class="sd">        where e = q_desired - q</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Get state variables</span>
+        <span class="n">q</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">robot_state</span><span class="p">[</span><span class="s1">&#39;qpos&#39;</span><span class="p">])</span>
+        <span class="n">dq</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">robot_state</span><span class="p">[</span><span class="s1">&#39;qvel&#39;</span><span class="p">])</span>
+        <span class="n">last_torque</span> <span class="o">=</span> <span class="n">robot_state</span><span class="p">[</span><span class="s1">&#39;last_torque&#39;</span><span class="p">]</span>
+
+        <span class="c1"># Get current target (thread-safe)</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">state_lock</span><span class="p">:</span>
+            <span class="n">kp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">kp</span>
+            <span class="n">ki</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ki</span>
+            <span class="n">kd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">kd</span>
+            <span class="n">q_desired</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">q_desired</span>
+            <span class="n">q_goal</span> <span class="o">=</span> <span class="n">q_desired</span>
+    
+        <span class="n">position_error</span> <span class="o">=</span> <span class="n">q_goal</span> <span class="o">-</span> <span class="n">q</span>
+        
+        <span class="c1"># Update integral term (dt = 1ms = 0.001s)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">error_integral</span> <span class="o">+=</span> <span class="n">position_error</span> <span class="o">*</span> <span class="mf">1e-3</span>
+        
+        <span class="c1"># Anti-windup: clamp integral term</span>
+        <span class="n">integral_limit</span> <span class="o">=</span> <span class="mf">10.0</span>  <span class="c1"># Nm*s (adjust as needed)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">error_integral</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">error_integral</span><span class="p">,</span> <span class="o">-</span><span class="n">integral_limit</span><span class="p">,</span> <span class="n">integral_limit</span><span class="p">)</span>
+
+        <span class="c1"># Compute PID control</span>
+        <span class="n">tau</span> <span class="o">=</span> <span class="n">position_error</span> <span class="o">*</span> <span class="n">kp</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">error_integral</span> <span class="o">*</span> <span class="n">ki</span> <span class="o">-</span> <span class="n">dq</span> <span class="o">*</span> <span class="n">kd</span>
+
+        <span class="n">tau_d</span> <span class="o">=</span> <span class="n">tau</span>
+        
+        <span class="c1"># Torque rate limiting</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">clip</span><span class="p">:</span>
+            <span class="n">diff</span> <span class="o">=</span> <span class="p">(</span><span class="n">tau_d</span> <span class="o">-</span> <span class="n">last_torque</span><span class="p">)</span><span class="o">/</span><span class="mf">1e-3</span>
+            <span class="n">diff</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">diff</span><span class="p">,</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">torque_diff_limit</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">torque_diff_limit</span><span class="p">)</span>
+            <span class="n">tau_d</span> <span class="o">=</span> <span class="n">last_torque</span> <span class="o">+</span> <span class="n">diff</span> <span class="o">*</span> <span class="mf">1e-3</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">torque</span> <span class="o">=</span> <span class="n">tau_d</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">robot</span><span class="o">.</span><span class="n">step</span><span class="p">(</span><span class="n">tau_d</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_impedance_step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">robot_state</span><span class="p">):</span> 
 

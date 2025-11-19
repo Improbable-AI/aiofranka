@@ -19,7 +19,7 @@
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Examples" href="examples.html" />
+    <link rel="next" title="Controllers" href="controllers.html" />
     <link rel="prev" title="Installation" href="installation.html" /> 
 </head>
 
@@ -53,31 +53,17 @@
 <li class="toctree-l2"><a class="reference internal" href="#controller-modes">Controller Modes</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#impedance-control-joint-space">Impedance Control (Joint Space)</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#operational-space-control-task-space">Operational Space Control (Task Space)</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#direct-torque-control">Direct Torque Control</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#common-patterns">Common Patterns</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#try-finally-for-safety">Try-Finally for Safety</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#data-collection">Data Collection</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#thread-safe-updates">Thread-Safe Updates</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#next-steps">Next Steps</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">User Guide:</span></p>
-<ul>
 <li class="toctree-l1"><a class="reference internal" href="controllers.html">Controllers</a></li>
-<li class="toctree-l1"><a class="reference internal" href="safety.html">Safety Guidelines</a></li>
-<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="api/robot.html">Robot Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/controller.html">Franka Controller</a></li>
-<li class="toctree-l1"><a class="reference internal" href="api/client.html">Client</a></li>
 </ul>
 
         </div>
@@ -286,97 +272,6 @@
 </div>
 <p><strong>Best for</strong>: Cartesian motions, end-effector tracking</p>
 </section>
-<section id="direct-torque-control">
-<h3>Direct Torque Control<a class="headerlink" href="#direct-torque-control" title="Link to this heading"></a></h3>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">controller</span><span class="o">.</span><span class="n">switch</span><span class="p">(</span><span class="s2">&quot;torque&quot;</span><span class="p">)</span>
-
-<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">):</span>
-    <span class="n">torque</span> <span class="o">=</span> <span class="n">compute_torque</span><span class="p">()</span>  <span class="c1"># Your control law</span>
-    <span class="k">with</span> <span class="n">controller</span><span class="o">.</span><span class="n">state_lock</span><span class="p">:</span>
-        <span class="n">controller</span><span class="o">.</span><span class="n">torque</span> <span class="o">=</span> <span class="n">torque</span>
-    <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="mf">50.0</span><span class="p">)</span>
-</pre></div>
-</div>
-<p><strong>Best for</strong>: Custom controllers, learning-based control</p>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>Torque mode has no built-in safety limits. Test in simulation first!</p>
-</div>
-</section>
-</section>
-<section id="common-patterns">
-<h2>Common Patterns<a class="headerlink" href="#common-patterns" title="Link to this heading"></a></h2>
-<section id="try-finally-for-safety">
-<h3>Try-Finally for Safety<a class="headerlink" href="#try-finally-for-safety" title="Link to this heading"></a></h3>
-<p>Always use try-finally to ensure the robot stops:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">safe_control</span><span class="p">():</span>
-    <span class="n">robot</span> <span class="o">=</span> <span class="n">RobotInterface</span><span class="p">(</span><span class="s2">&quot;172.16.0.2&quot;</span><span class="p">)</span>
-    <span class="n">controller</span> <span class="o">=</span> <span class="n">FrankaController</span><span class="p">(</span><span class="n">robot</span><span class="p">)</span>
-
-    <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
-
-    <span class="k">try</span><span class="p">:</span>
-        <span class="c1"># Your control code</span>
-        <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">move</span><span class="p">()</span>
-
-    <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Interrupted by user&quot;</span><span class="p">)</span>
-
-    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-    <span class="k">finally</span><span class="p">:</span>
-        <span class="c1"># Always stop</span>
-        <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
-
-<span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">safe_control</span><span class="p">())</span>
-</pre></div>
-</div>
-</section>
-<section id="data-collection">
-<h3>Data Collection<a class="headerlink" href="#data-collection" title="Link to this heading"></a></h3>
-<p>Collect synchronized data at high frequency:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">logs</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;qpos&#39;</span><span class="p">:</span> <span class="p">[],</span> <span class="s1">&#39;qvel&#39;</span><span class="p">:</span> <span class="p">[],</span> <span class="s1">&#39;ctrl&#39;</span><span class="p">:</span> <span class="p">[]}</span>
-<span class="n">controller</span><span class="o">.</span><span class="n">set_freq</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span>  <span class="c1"># 100 Hz</span>
-
-<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1000</span><span class="p">):</span>
-    <span class="n">state</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">state</span>
-    <span class="n">logs</span><span class="p">[</span><span class="s1">&#39;qpos&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="s1">&#39;qpos&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">())</span>
-    <span class="n">logs</span><span class="p">[</span><span class="s1">&#39;qvel&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="s1">&#39;qvel&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">())</span>
-    <span class="n">logs</span><span class="p">[</span><span class="s1">&#39;ctrl&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="s1">&#39;last_torque&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">())</span>
-
-    <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;q_desired&quot;</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>
-
-<span class="c1"># Save data</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">logs</span><span class="p">:</span>
-    <span class="n">logs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">logs</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
-<span class="n">np</span><span class="o">.</span><span class="n">savez</span><span class="p">(</span><span class="s2">&quot;experiment.npz&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">logs</span><span class="p">)</span>
-</pre></div>
-</div>
-</section>
-<section id="thread-safe-updates">
-<h3>Thread-Safe Updates<a class="headerlink" href="#thread-safe-updates" title="Link to this heading"></a></h3>
-<p>When modifying controller parameters:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Reading (always safe)</span>
-<span class="n">current_gains</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">kp</span>
-
-<span class="c1"># Writing (use lock)</span>
-<span class="k">with</span> <span class="n">controller</span><span class="o">.</span><span class="n">state_lock</span><span class="p">:</span>
-    <span class="n">controller</span><span class="o">.</span><span class="n">kp</span> <span class="o">=</span> <span class="n">new_gains</span>
-    <span class="n">controller</span><span class="o">.</span><span class="n">kd</span> <span class="o">=</span> <span class="n">new_damping</span>
-</pre></div>
-</div>
-</section>
-</section>
-<section id="next-steps">
-<h2>Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading"></a></h2>
-<ul class="simple">
-<li><p>Explore <a class="reference internal" href="examples.html"><span class="doc">Examples</span></a> for complete applications</p></li>
-<li><p>Read about <a class="reference internal" href="controllers.html"><span class="doc">Controllers</span></a> in detail</p></li>
-<li><p>Review <a class="reference internal" href="safety.html"><span class="doc">Safety Guidelines</span></a> guidelines</p></li>
-<li><p>Check <a class="reference internal" href="api/controller.html"><span class="doc">Franka Controller</span></a> for full API reference</p></li>
-</ul>
 </section>
 </section>
 
@@ -385,7 +280,7 @@
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="installation.html" class="btn btn-neutral float-left" title="Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="examples.html" class="btn btn-neutral float-right" title="Examples" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="controllers.html" class="btn btn-neutral float-right" title="Controllers" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

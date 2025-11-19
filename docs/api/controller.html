@@ -19,7 +19,6 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Client" href="client.html" />
     <link rel="prev" title="Robot Interface" href="robot.html" /> 
 </head>
 
@@ -46,13 +45,8 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quick Start</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">User Guide:</span></p>
-<ul>
 <li class="toctree-l1"><a class="reference internal" href="../controllers.html">Controllers</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../safety.html">Safety Guidelines</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../troubleshooting.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
 <ul class="current">
@@ -88,7 +82,6 @@
 </li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="client.html">Client</a></li>
 </ul>
 
         </div>
@@ -592,6 +585,7 @@ clears rate-limiting timing.</p>
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>controller_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Controller type to switch to:
 - “impedance”: Joint-space impedance control
+- “pid”: Joint-space PID control with integral term
 - “osc”: Operational space control (task space)
 - “torque”: Direct torque control</p>
 </dd>
@@ -613,6 +607,7 @@ clears rate-limiting timing.</p>
 <li><p>Resets q_desired to current position</p></li>
 <li><p>Resets ee_desired to current end-effector pose</p></li>
 <li><p>Clears timing state from previous set() calls</p></li>
+<li><p>Resets integral term when switching to/from PID</p></li>
 </ul>
 </div>
 <dl class="simple">
@@ -697,7 +692,6 @@ Default: Home position</p>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="robot.html" class="btn btn-neutral float-left" title="Robot Interface" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="client.html" class="btn btn-neutral float-right" title="Client" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

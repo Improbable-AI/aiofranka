@@ -120,6 +120,8 @@ class FrankaController:
 
 
         self.kp, self.kd = np.ones(7) * 80, np.ones(7) * 4
+        self.ki = np.ones(7) * 0.1  # Integral gains
+        self.error_integral = np.zeros(7)  # Accumulated error
         self.ee_kp, self.ee_kd = np.ones(6) * 100, np.ones(6) * 4
         self.null_kp, self.null_kd = np.ones(7) * 1, np.ones(7) * 1
 
@@ -431,6 +433,7 @@ class FrankaController:
         Args:
             controller_type (str): Controller type to switch to:
                 - "impedance": Joint-space impedance control
+                - "pid": Joint-space PID control with integral term
                 - "osc": Operational space control (task space)
                 - "torque": Direct torque control
                 
@@ -448,6 +451,7 @@ class FrankaController:
             - Resets q_desired to current position
             - Resets ee_desired to current end-effector pose
             - Clears timing state from previous set() calls
+            - Resets integral term when switching to/from PID
             
         Caveats:
             - Switching causes brief discontinuity in control
@@ -456,6 +460,8 @@ class FrankaController:
         """
         self.type = controller_type
         self.initialize()
+        # Reset integral term when switching controllers
+        self.error_integral = np.zeros(7)
         # Reset timing state when switching controllers
         self._last_update_time.clear()
 
@@ -463,6 +469,8 @@ class FrankaController:
         self.state = self.robot.state
         if self.type == "impedance":
             self._impedance_step(self.state)
+        elif self.type == "pid":
+            self._pid_step(self.state)
         elif self.type == "osc":
             self._osc_step(self.state)
         elif self.type == "torque":
@@ -530,6 +538,49 @@ class FrankaController:
 
     
 
+
+    def _pid_step(self, robot_state):
+        """
+        PID control in joint space with integral term for steady-state error.
+        
+        Computes: τ = Kp*e + Ki*∫e*dt - Kd*dq
+        where e = q_desired - q
+        """
+        # Get state variables
+        q = np.array(robot_state['qpos'])
+        dq = np.array(robot_state['qvel'])
+        last_torque = robot_state['last_torque']
+
+        # Get current target (thread-safe)
+        with self.state_lock:
+            kp = self.kp
+            ki = self.ki
+            kd = self.kd
+            q_desired = self.q_desired
+            q_goal = q_desired
+    
+        position_error = q_goal - q
+        
+        # Update integral term (dt = 1ms = 0.001s)
+        self.error_integral += position_error * 1e-3
+        
+        # Anti-windup: clamp integral term
+        integral_limit = 10.0  # Nm*s (adjust as needed)
+        self.error_integral = np.clip(self.error_integral, -integral_limit, integral_limit)
+
+        # Compute PID control
+        tau = position_error * kp + self.error_integral * ki - dq * kd
+
+        tau_d = tau
+        
+        # Torque rate limiting
+        if self.clip:
+            diff = (tau_d - last_torque)/1e-3
+            diff = np.clip(diff, -self.torque_diff_limit, self.torque_diff_limit)
+            tau_d = last_torque + diff * 1e-3
+
+        self.torque = tau_d
+        self.robot.step(tau_d)
 
     def _impedance_step(self, robot_state): 
 
