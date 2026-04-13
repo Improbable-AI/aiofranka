@@ -1749,10 +1749,10 @@ def _run_all_combos(args):
 
 
 def cmd_gripper(args):
-    """Open or close the Robotiq gripper."""
+    """Open or close the gripper (Robotiq or Franka hand)."""
     from aiofranka.gripper_remote import GripperRemoteController
 
-    gripper = GripperRemoteController(args.port)
+    gripper = GripperRemoteController(args.port, backend=args.backend, home=args.home)
     gripper.start()
     gripper.speed = args.speed
     gripper.force = args.force
@@ -2098,11 +2098,28 @@ def main():
     p_log.add_argument("-f", "--follow", action="store_true", help="Follow log output (like tail -f)")
 
     # gripper
-    p_gripper = subparsers.add_parser("gripper", help="Open or close the Robotiq gripper")
+    p_gripper = subparsers.add_parser("gripper", help="Open or close gripper (Robotiq serial or Franka hand)")
     p_gripper_action = p_gripper.add_mutually_exclusive_group(required=True)
     p_gripper_action.add_argument("--open", action="store_true", help="Fully open the gripper")
     p_gripper_action.add_argument("--close", action="store_true", help="Fully close the gripper")
-    p_gripper.add_argument("--port", type=str, default="/dev/ttyUSB1", help="Serial port (default: /dev/ttyUSB1)")
+    p_gripper.add_argument(
+        "--port",
+        type=str,
+        default="/dev/ttyUSB1",
+        help="Robotiq serial port (e.g. /dev/ttyUSB1) or Franka robot IP",
+    )
+    p_gripper.add_argument(
+        "--backend",
+        type=str,
+        choices=["auto", "robotiq", "franka"],
+        default="auto",
+        help="Select gripper backend (default: auto)",
+    )
+    p_gripper.add_argument(
+        "--home",
+        action="store_true",
+        help="Run homing on startup (Franka backend only)",
+    )
     p_gripper.add_argument("--speed", type=int, default=128, help="Gripper speed 1-255 (default: 128)")
     p_gripper.add_argument("--force", type=int, default=128, help="Gripper force 0-255 (default: 128)")
 
