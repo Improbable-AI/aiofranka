@@ -338,8 +338,13 @@ def _write_progress(robot_ip: str, step: int, total: int, label: str,
     if warn:
         data["warn"] = warn
     data.update(extra)
-    with open(path, "w") as f:
-        _json.dump(data, f)
+    try:
+        with open(path, "w") as f:
+            _json.dump(data, f)
+    except PermissionError:
+        # Progress reporting is best-effort. If a stale root-owned file in /tmp
+        # blocks writes, keep the server running instead of crashing.
+        logger.warning("Cannot write progress file %s (permission denied).", path)
 
 
 def _cleanup_ipc(robot_ip: str):
@@ -347,11 +352,11 @@ def _cleanup_ipc(robot_ip: str):
     sock_path = zmq_endpoint_for_ip(robot_ip).replace("ipc://", "")
     try:
         os.unlink(sock_path)
-    except FileNotFoundError:
+    except (FileNotFoundError, PermissionError):
         pass
     try:
         os.unlink(progress_file_for_ip(robot_ip))
-    except FileNotFoundError:
+    except (FileNotFoundError, PermissionError):
         pass
     _remove_pid(robot_ip)
 

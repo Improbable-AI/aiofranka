@@ -6,13 +6,24 @@ setup(
     packages=find_packages(),
     install_requires=[
         "pylibfranka",
-        "ruckig", 
-        "numpy", 
+        "ruckig",
+        "numpy",
         "scipy", 
         "mujoco",
-        "tqdm"
+        "tqdm",
         "requests",
     ],
+    extras_require={
+        "teleop": [
+            "pyspacemouse",
+            "aprilcube",
+            "pyrealsense2",
+        ],
+        "robotiq": [
+            "minimalmodbus",
+            "pyrobotiqgripper",
+        ],
+    },
     author="MIT Improbable AI Lab",
     author_email="",
     description="A Python package for Franka robot control using asyncio.",

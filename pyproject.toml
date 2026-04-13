@@ -41,6 +41,11 @@ docs = [
     "sphinx>=7.0.0",
     "sphinx-rtd-theme>=2.0.0",
 ]
+teleop = [
+    "pyspacemouse",
+    "aprilcube",
+    "pyrealsense2",
+]
 robotiq = [
     "minimalmodbus",
     "pyrobotiqgripper",

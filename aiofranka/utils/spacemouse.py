@@ -1,5 +1,38 @@
+import importlib.util
+
+import easyhid.easyhid as _easyhid_backend
 import pyspacemouse
 import numpy as np
+
+
+_HID_BACKEND_PATCHED = False
+
+
+def _patch_hid_backend() -> bool:
+    """Patch easyhid to use the hidraw extension when libhidapi-hidraw is missing.
+
+    Some conda environments provide `hidraw` as a Python extension module with
+    exported hidapi symbols, but do not provide a standalone `libhidapi-hidraw`
+    shared library discoverable by `ctypes.find_library`. In that case, easyhid
+    falls back to `dlopen(None)` and later fails with `hid_enumerate` missing.
+    """
+    global _HID_BACKEND_PATCHED
+    if _HID_BACKEND_PATCHED:
+        return True
+
+    spec = importlib.util.find_spec("hidraw")
+    if spec is None or spec.origin is None:
+        return False
+
+    try:
+        hidapi_lib = _easyhid_backend.ffi.dlopen(spec.origin)
+        # Validate a key symbol before replacing backend.
+        _ = hidapi_lib.hid_enumerate
+        _easyhid_backend.hidapi = hidapi_lib
+        _HID_BACKEND_PATCHED = True
+        return True
+    except Exception:
+        return False
 
 
 class SpaceMouse:
@@ -28,7 +61,14 @@ class SpaceMouse:
         self.rotation_scale = rotation_scale
         self.rotation_clip = rotation_clip
         self.yaw_only = yaw_only
-        self._device = pyspacemouse.open().__enter__()
+        try:
+            self._device = pyspacemouse.open().__enter__()
+        except RuntimeError as e:
+            # Recover from missing hidapi shared-library discovery in some envs.
+            if "HID API is probably not installed" in str(e) and _patch_hid_backend():
+                self._device = pyspacemouse.open().__enter__()
+            else:
+                raise
 
     def read(self):
         """Read the latest spacemouse state, draining any buffered HID reports.
