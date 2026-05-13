@@ -40,3 +40,5 @@ demos/
 
 rss2026/
 checkpoints/
+examples/sysid_*
+examples/TEST_*

@@ -129,7 +129,7 @@ def _check_control_token(robot_ip: str, username: str, password: str,
             return False  # robot needs full unlock, daemon will handle it
         # Robot is already unlocked + FCI active — try to get token
         client.take_token(timeout=5)
-        client.release_token()  # release so the daemon can take it
+        client.release_token(best_effort=True)  # release so the daemon can take it
         return False
     except Exception:
         # Token held by someone else — check if the old server is dead
@@ -172,7 +172,7 @@ def _check_control_token(robot_ip: str, username: str, password: str,
                 try:
                     client2 = _DeskClientV2(robot_ip, username, password, protocol=protocol)
                     client2.take_token(timeout=5)
-                    client2.release_token()
+                    client2.release_token(best_effort=True)
                     print(f"  {GREEN}Control token is now available.{RST}\n")
                     return False
                 except Exception:
@@ -296,8 +296,11 @@ def cmd_gravcomp(args):
 
             _save_token_state(robot_ip, client._token, client._token_id)
         except Exception:
-            client.release_token()
-            _clear_token(robot_ip)
+            try:
+                client.release_token(best_effort=True)
+                _clear_token(robot_ip)
+            except Exception:
+                pass
             raise
 
         print(f"\n  {GREEN}Running{RST} {DIM}— robot is in gravity compensation mode{RST}")
@@ -373,8 +376,11 @@ def cmd_home(args):
 
             _save_token_state(robot_ip, client._token, client._token_id)
         except Exception:
-            client.release_token()
-            _clear_token(robot_ip)
+            try:
+                client.release_token(best_effort=True)
+                _clear_token(robot_ip)
+            except Exception:
+                pass
             raise
 
         print()
@@ -918,7 +924,7 @@ def cmd_mode(args):
         step = 3
         _cli_run_with_spinner(
             "Releasing control token", step, total_steps,
-            lambda: client.release_token()
+            client.release_token
         )
 
         print(f"\n  {GREEN}Operating mode changed to {desired}{RST}\n")
@@ -1120,7 +1126,7 @@ def cmd_config(args):
     finally:
         if took_token:
             try:
-                client.release_token()
+                client.release_token(best_effort=True)
             except Exception:
                 pass
 
@@ -1206,12 +1212,18 @@ def cmd_lock(args):
     try:
         client = _DeskClientV2(robot_ip, username, password, protocol=protocol)
 
-        # Step 1: Acquire control token
+        # Step 1: Acquire control token (reuse saved token if valid)
         saved_token, saved_token_id = _load_token_state(robot_ip)
         if saved_token is not None:
             client._token = saved_token
             client._token_id = saved_token_id
             if not client.validate_token():
+                # Saved token is stale — release it so take_token won't deadlock
+                try:
+                    client.release_token(best_effort=True)
+                except Exception:
+                    pass
+                _clear_token(robot_ip)
                 client._token = None
                 client._token_id = None
 
@@ -1236,10 +1248,10 @@ def cmd_lock(args):
             _clear_token(robot_ip)
         except Exception:
             try:
-                client.release_token()
+                client.release_token(best_effort=True)
+                _clear_token(robot_ip)
             except Exception:
                 pass
-            _clear_token(robot_ip)
             raise
 
         print(f"\n  {GREEN}Locked{RST}\n")
@@ -1268,20 +1280,27 @@ def cmd_unlock(args):
     try:
         client = _DeskClientV2(robot_ip, username, password, protocol=protocol)
 
-        # Release any stale saved token first
-        old_token, old_token_id = _load_token_state(robot_ip)
-        if old_token is not None:
-            client._token = old_token
-            client._token_id = old_token_id
-            try:
-                client.release_token()
-            except Exception:
-                pass
-            _clear_token(robot_ip)
+        # Step 1: Acquire control token (reuse saved token if valid)
+        saved_token, saved_token_id = _load_token_state(robot_ip)
+        if saved_token is not None:
+            client._token = saved_token
+            client._token_id = saved_token_id
+            if not client.validate_token():
+                # Saved token is stale — release it so take_token won't deadlock
+                try:
+                    client.release_token(best_effort=True)
+                except Exception:
+                    pass
+                _clear_token(robot_ip)
+                client._token = None
+                client._token_id = None
 
-        # Step 1: Acquire control token
-        _cli_run_with_spinner("Acquiring control token", 1, total,
-                              client.take_token, timeout=15)
+        if client._token is None:
+            _cli_run_with_spinner("Acquiring control token", 1, total,
+                                  client.take_token, timeout=15)
+        else:
+            print(_cli_step_line(1, total, "Acquiring control token",
+                                 f"{GREEN}done{RST} {DIM}(reused){RST}"))
 
         try:
             # Step 2: Recover safety errors
@@ -1297,8 +1316,11 @@ def cmd_unlock(args):
 
             _save_token_state(robot_ip, client._token, client._token_id)
         except Exception:
-            client.release_token()
-            _clear_token(robot_ip)
+            try:
+                client.release_token(best_effort=True)
+                _clear_token(robot_ip)
+            except Exception:
+                pass
             raise
 
         print(f"\n  {GREEN}Unlocked{RST} {DIM}(FCI active){RST}")
@@ -1308,7 +1330,7 @@ def cmd_unlock(args):
 
 
 def cmd_selftest(args):
-    from aiofranka.server import _DeskClientV2
+    from aiofranka.server import _DeskClientV2, _load_token_state, _clear_token
     from aiofranka.ipc import pid_file_for_ip
 
     robot_ip = _resolve_ip(args.ip)
@@ -1357,9 +1379,27 @@ def cmd_selftest(args):
         elif status == "Elapsed":
             print(f"\n  Self-tests are {RED}overdue{RST}.\n")
 
-        # Step 2: Acquire token
-        _cli_run_with_spinner("Acquiring control token", 2, total,
-                              client.take_token, timeout=15)
+        # Step 2: Acquire token (reuse saved token if valid)
+        saved_token, saved_token_id = _load_token_state(robot_ip)
+        if saved_token is not None:
+            client._token = saved_token
+            client._token_id = saved_token_id
+            if not client.validate_token():
+                # Saved token is stale — release it so take_token won't deadlock
+                try:
+                    client.release_token(best_effort=True)
+                except Exception:
+                    pass
+                _clear_token(robot_ip)
+                client._token = None
+                client._token_id = None
+
+        if client._token is None:
+            _cli_run_with_spinner("Acquiring control token", 2, total,
+                                  client.take_token, timeout=15)
+        else:
+            print(_cli_step_line(2, total, "Acquiring control token",
+                                 f"{GREEN}done{RST} {DIM}(reused){RST}"))
 
         try:
             # Step 3: Run self-tests
@@ -1376,7 +1416,7 @@ def cmd_selftest(args):
             else:
                 print(f"\n  {GREEN}Self-tests passed.{RST}\n")
         finally:
-            client.release_token()
+            client.release_token(best_effort=True)
 
     except Exception as e:
         sys.stdout.write(f"\r{' ' * 70}\r")
@@ -1670,7 +1710,7 @@ def _run_all_combos(args):
         _save_token_state(robot_ip, client._token, client._token_id)
     except Exception:
         try:
-            client.release_token()
+            client.release_token(best_effort=True)
             _clear_token(robot_ip)
         except Exception:
             pass
@@ -1727,7 +1767,7 @@ def _run_all_combos(args):
     finally:
         robot.stop()
         try:
-            client.release_token()
+            client.release_token(best_effort=True)
             _clear_token(robot_ip)
         except Exception:
             pass
@@ -1841,7 +1881,7 @@ def cmd_rt_benchmark(args):
 
     except Exception:
         try:
-            client.release_token()
+            client.release_token(best_effort=True)
             _clear_token(robot_ip)
         except Exception:
             pass
@@ -1862,7 +1902,7 @@ def cmd_rt_benchmark(args):
     finally:
         robot.stop()
         try:
-            client.release_token()
+            client.release_token(best_effort=True)
             _clear_token(robot_ip)
         except Exception:
             pass

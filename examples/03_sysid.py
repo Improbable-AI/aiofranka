@@ -22,6 +22,7 @@ parser.add_argument("--num_envs", type=int, default=1, help="Number of environme
 parser.add_argument("--gripper", action="store_true", help="Use gripper")
 parser.add_argument("--name", type=str, default="test", help="Name of the experiment")
 parser.add_argument("--dir", type=str, default=".", help="Directory for results")
+parser.add_argument("--sysid_path", type=str, required=True, help="Path to sysid npz file")
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 # parse the arguments
@@ -122,7 +123,8 @@ def inertia_from_log_delta(I0, theta: np.ndarray, eps=1e-9):
 # np.random.seed(0)
 
 
-print(f"{ISAAC_NUCLEUS_DIR}/Robots/Franka/FR3/fr3.usd".replace("5.1", "4.5"))
+_usd_path = f"{ISAAC_NUCLEUS_DIR}/Robots/Franka/FR3/fr3.usd".replace("5.1", "4.5")
+print(f"[DEBUG] USD path: {_usd_path}")
 
 FRANKA_FR3_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
@@ -259,14 +261,20 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     lower = np.array([-2.7437, -1.7837, -2.9007, -3.0421, -2.8065, 0.5445, -3.0519])
     upper = np.array([+2.7437, +1.7837, +2.9007, +0.1518, +2.8065, +4.5169, +3.0519])
 
-    name = args_cli.name
+    sysid_dir = os.path.dirname(args_cli.sysid_path)
+    parent_path = os.path.dirname(sysid_dir)
+    dir_name = os.path.basename(sysid_dir)
+    # extract K and D from filename like sysid_K64_D8.npz
+    stem = os.path.splitext(os.path.basename(args_cli.sysid_path))[0]  # sysid_K64_D8
+    kd_part = stem.replace("sysid_", "")  # K64_D8
+    result_dir = os.path.join(parent_path, f"{dir_name}_result", kd_part)
+    os.makedirs(result_dir, exist_ok=True)
 
-    os.makedirs(f"same_frequency_results/{name}", exist_ok=True)
-
-    real_data = np.load(f"examples/sysid_left_new/sysid_{name}.npz")
+    print("[DEBUG] Loading sysid data...")
+    real_data = np.load(args_cli.sysid_path)
     # print(real_+d)
     real_data = {k: v for k, v in real_data.items()}
-    print(real_data.keys())
+    print(f"[DEBUG] Sysid data loaded. Keys: {real_data.keys()}")
 
 
     joint_pos = np.zeros(9)
@@ -279,8 +287,11 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     torch_joint_pos = torch.from_numpy(joint_pos).to(torch.float32).to(args_cli.device).unsqueeze(0)
     torch_joint_vel = torch.from_numpy(joint_vel).to(torch.float32).to(args_cli.device).unsqueeze(0)
 
+    print("[DEBUG] Writing initial joint state to sim...")
     scene["Franka"].write_joint_state_to_sim(torch_joint_pos, torch_joint_vel)
+    print("[DEBUG] Calling initial scene.reset()...")
     scene.reset()
+    print("[DEBUG] Initial scene.reset() done.")
 
     if args_cli.gripper:
         joint_num = 9
@@ -304,9 +315,11 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
 
     print(bounds)
 
+    print("[DEBUG] Creating CMA optimizer...")
     optimizer = CMA(mean = init_guess, sigma = 3.0, \
         bounds = bounds,
             population_size = args_cli.num_envs)
+    print("[DEBUG] CMA optimizer created.")
 
 
     plots = []
@@ -334,8 +347,7 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
             pd_gains.append(pd_gain)
         pd_gains = np.stack(pd_gains, axis = 0)
 
-        print("writing joint armature and friction coefficient")
-
+        print("[DEBUG] Writing joint stiffness/damping/armature/friction to sim...")
 
         # write the joint armature, friction coefficient, dynamic friction coefficient, and viscous friction coefficient to the simulator
         scene["Franka"].write_joint_stiffness_to_sim(torch.from_numpy(2 ** pd_gains[:, 0:joint_num  ]).to(args_cli.device).type(torch.float32), \
@@ -352,7 +364,7 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
 
         scene["Franka"].write_joint_friction_coefficient_to_sim(static_friction, dynamic_friction, viscous_friction, \
                                                                 joint_ids = torch.tensor([i for i in range(joint_num)]).type(torch.int).to(args_cli.device))
-        
+        print("[DEBUG] Joint properties written.")
 
 
         costs = np.zeros(args_cli.num_envs)
@@ -366,8 +378,11 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
         torch_joint_pos = torch.from_numpy(joint_pos).to(torch.float32).to(args_cli.device).unsqueeze(0)
         torch_joint_vel = torch.from_numpy(joint_vel).to(torch.float32).to(args_cli.device).unsqueeze(0)
 
+        print("[DEBUG] Writing joint state before rollout...")
         scene["Franka"].write_joint_state_to_sim(torch_joint_pos, torch_joint_vel)
+        print("[DEBUG] Calling scene.reset() before rollout...")
         scene.reset()
+        print("[DEBUG] scene.reset() done. Starting rollout...")
 
         joint_positions = []
         joint_velocities = [] 
@@ -387,14 +402,22 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
             # wave_action[:, 0:7] += magnitude * np.sin(2 * np.pi * frequency * (sim_time - reset_sim_time))
             # wave_action[:, 0:7] += noise_magnitude * torch.randn_like(wave_action[:, 0:7])
 
-            for _ in range(2):
+            for sub_step in range(2):
+                if count < 3:
+                    print(f"[DEBUG] Rollout step {count}, sub_step {sub_step}: set_joint_position_target...")
                 scene["Franka"].set_joint_position_target(wave_action)
 
+                if count < 3:
+                    print(f"[DEBUG] Rollout step {count}, sub_step {sub_step}: write_data_to_sim...")
                 scene.write_data_to_sim()
+                if count < 3:
+                    print(f"[DEBUG] Rollout step {count}, sub_step {sub_step}: sim.step()...")
                 sim.step()
 
                 sim_time += sim_dt
                 count += 1
+                if count < 5:
+                    print(f"[DEBUG] Rollout step {count}, sub_step {sub_step}: scene.update()...")
                 scene.update(sim_dt)
 
             joint_positions.append(scene["Franka"].data.joint_pos.clone().cpu().squeeze().numpy())
@@ -472,7 +495,7 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
 
         if min_cost < lowest_loss:
             lowest_loss = min_cost
-            with open(f"same_frequency_results/{name}/best_seed{rand_run_int}.json", "w") as f:
+            with open(os.path.join(result_dir, f"best_seed{rand_run_int}.json"), "w") as f:
                 json.dump(info, f, indent=4)
 
 
@@ -497,7 +520,7 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
         print("================================================")
 
 
-        plot = draw_real_plot(name, min_cost, iii, sjps[argidx], jts[argidx], rjps, \
+        plot = draw_real_plot(result_dir, min_cost, iii, sjps[argidx], jts[argidx], rjps, \
                 actual_p_gains, actual_d_gains, \
                 pd_gains[argidx, 2*joint_num:3*joint_num], \
                 pd_gains[argidx, 3*joint_num:4*joint_num], \
@@ -507,7 +530,7 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
         # update the mean and sigma
         plots.append(plot)
 
-        imageio.mimsave(f'same_frequency_results/{name}/plots.mp4', plots, fps=10)
+        imageio.mimsave(os.path.join(result_dir, 'plots.mp4'), plots, fps=10)
 
 
     # raise exception and kill the script 
@@ -563,7 +586,7 @@ def draw_real_plot(name, cost, generation, joint_positions, joint_targets, real_
     plt.figtext(0.5, 0.06, viscous_friction_txt, ha='center', fontsize=12)
     plt.legend()
     axs[0].set_title(f"Generation {generation} | Cost: {cost:.5f}")
-    plt.savefig(f"same_frequency_results/{name}/plot.png", dpi=300, bbox_inches='tight', pad_inches=0.1)
+    plt.savefig(os.path.join(name, "plot.png"), dpi=300, bbox_inches='tight', pad_inches=0.1)
 
     # tight layout
     plt.tight_layout()
@@ -585,7 +608,9 @@ def main():
     scene_cfg = NewRobotsSceneCfg(args_cli.num_envs, env_spacing=2.0)
     scene = InteractiveScene(scene_cfg)
     # Play the simulator
+    print("[DEBUG] About to call sim.reset()...")
     sim.reset()
+    print("[DEBUG] sim.reset() done.")
     # Now we are ready!
     print("[INFO]: Setup complete...")
     # Run the simulator
