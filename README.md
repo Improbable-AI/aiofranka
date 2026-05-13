@@ -306,7 +306,7 @@ If you use this library in your research, please cite:
 
 ```bibtex
 @software{aiofranka,
-  author = {Improbable AI Lab},
+  author = {Park, Younghyo},
   title = {aiofranka: Asyncio-based Franka Robot Control},
   year = {2025},
   url = {https://github.com/Improbable-AI/aiofranka}
