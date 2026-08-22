@@ -1563,7 +1563,7 @@ def _run_bench_loop(robot, duration, cpu_pin=None, sched_fifo=None,
             _jac[:] = 0
             mujoco.mj_jacSite(model, data, _jac[:3], _jac[3:], site_id)
             _mm[:] = 0
-            mujoco.mj_fullM(model, _mm, data.qM)
+            mujoco.mj_fullM(model, data, _mm)
             t3 = time.perf_counter()
 
             np.copyto(_q, data.qpos)
@@ -1610,7 +1610,7 @@ def _run_bench_loop(robot, duration, cpu_pin=None, sched_fifo=None,
             jac = np.zeros((6, 7))
             mujoco.mj_jacSite(model, data, jac[:3], jac[3:], site_id)
             mm = np.zeros((7, 7))
-            mujoco.mj_fullM(model, mm, data.qM)
+            mujoco.mj_fullM(model, data, mm)
             t3 = time.perf_counter()
 
             q = np.array(data.qpos)

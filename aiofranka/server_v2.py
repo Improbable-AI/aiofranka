@@ -156,7 +156,7 @@ class ServerControllerV2(ServerController):
                 mujoco.mj_jacSite(model, data, _jac[:3], _jac[3:], site_id)
 
                 _mm[:] = 0
-                mujoco.mj_fullM(model, _mm, data.qM)
+                mujoco.mj_fullM(model, data, _mm)
 
                 np.copyto(_qpos, data.qpos)
                 np.copyto(_qvel, data.qvel)

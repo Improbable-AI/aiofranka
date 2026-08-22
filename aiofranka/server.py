@@ -94,7 +94,7 @@ class ServerController(FrankaController):
         mujoco.mj_jacSite(model, data, self._jac_buf[:3], self._jac_buf[3:], robot.site_id)
 
         self._mm_buf[:] = 0
-        mujoco.mj_fullM(model, self._mm_buf, data.qM)
+        mujoco.mj_fullM(model, data, self._mm_buf)
 
         np.copyto(self._qpos_buf, data.qpos)
         np.copyto(self._qvel_buf, data.qvel)

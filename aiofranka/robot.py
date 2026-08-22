@@ -219,7 +219,7 @@ class RobotInterface:
         """ Compute mass matrix at current state """
 
         mm = np.zeros((7,7))
-        mujoco.mj_fullM(self.model, mm, self.data.qM)
+        mujoco.mj_fullM(self.model, self.data, mm)
         return mm
 
     def _ee(self):

@@ -9,8 +9,8 @@ setup(
         "ruckig", 
         "numpy", 
         "scipy", 
-        "mujoco",
-        "tqdm"
+        "mujoco>=3.10",
+        "tqdm",
         "requests",
     ],
     author="MIT Improbable AI Lab",
@@ -24,5 +24,5 @@ setup(
         "License :: OSI Approved :: MIT License",  # Adjust license as needed
         "Operating System :: OS Independent",
     ],
-    python_requires=">3.7",
+    python_requires=">=3.10",
 )
