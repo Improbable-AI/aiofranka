@@ -25,6 +25,8 @@ Quick Example:
 For detailed documentation, see README.md and USAGE_GUIDE.md
 """
 
+from importlib.metadata import PackageNotFoundError, version as package_version
+
 from aiofranka.controller import FrankaController
 from aiofranka.robot import RobotInterface
 from aiofranka.async_utils import asyncify, async_input, CudaInferenceThread, mpify
@@ -40,7 +42,11 @@ try:
 except ImportError:
     _HAS_ROBOTIQ = False
 
-__version__ = "0.1.0"
+try:
+    __version__ = package_version("aiofranka")
+except PackageNotFoundError:
+    __version__ = "0+unknown"
+
 __all__ = ["RobotInterface", "FrankaController", "FrankaRemoteController", "FrankaRemoteControllerV2", "ServerDiedError", "asyncify", "async_input", "CudaInferenceThread", "mpify", "start", "stop", "lock", "unlock", "set_configuration"]
 
 if _HAS_ROBOTIQ:

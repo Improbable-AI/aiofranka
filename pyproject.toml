@@ -1,14 +1,15 @@
 [build-system]
-requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+requires = ["setuptools>=77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "aiofranka"
-version = "0.3.0"
+version = "0.4.0"
 description = "A Python package for Franka robot control using asyncio."
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = "MIT AND Apache-2.0 AND BSD-3-Clause"
+license-files = ["LICENSE", "aiofranka/model/LICENSE"]
 authors = [
     {name = "MIT Improbable AI Lab"}
 ]
@@ -17,7 +18,6 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 dependencies = [
@@ -48,3 +48,21 @@ robotiq = [
 [project.urls]
 Homepage = "https://github.com/Improbable-AI/aiofranka"
 Repository = "https://github.com/Improbable-AI/aiofranka"
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["aiofranka", "aiofranka.*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+aiofranka = [
+    "model/fr3.xml",
+    "model/scene.xml",
+    "model/assets/link*_*.obj",
+    "model/assets/link1.obj",
+    "model/assets/link2.obj",
+    "model/assets/*.stl",
+]

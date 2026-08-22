@@ -1,4 +1,19 @@
 include README.md
 include LICENSE
-recursive-include aiofranka/model *.xml *.md LICENSE
-recursive-include aiofranka/model/assets *
+include CHANGELOG.md
+include aiofranka/model/fr3.xml
+include aiofranka/model/scene.xml
+include aiofranka/model/LICENSE
+recursive-include aiofranka/model/assets link*_*.obj *.stl
+include aiofranka/model/assets/link1.obj
+include aiofranka/model/assets/link2.obj
+recursive-include tests *.py
+
+prune .github
+prune .vscode
+prune assets
+prune docs
+prune examples
+prune aiofranka/docs
+global-exclude __pycache__
+global-exclude *.py[cod]

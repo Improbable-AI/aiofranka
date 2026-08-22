@@ -250,7 +250,7 @@ def cmd_gravcomp(args):
     damping = args.damping
 
     print(f"\n  {BOLD}aiofranka{RST} {DIM}|{RST} gravcomp {DIM}({robot_ip}){RST}")
-    print(f"  {DIM}kp=0  kd={damping}  (Ctrl+C to stop and lock){RST}\n")
+    print(f"  {DIM}kp=0  kd={damping}  (Ctrl+C stops control; joints stay unlocked){RST}\n")
 
     setup_total = 4
     try:
