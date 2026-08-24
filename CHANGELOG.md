@@ -15,4 +15,4 @@
 - Make server shutdown, restart, and control-token recovery more reliable, with actionable server-failure reporting.
 - Restore `aiofranka start-server` and add `home`, Robotiq `gripper`, and `rt-benchmark` commands, plus an optional gravity-compensation `/qpos` endpoint.
 - Add synchronous background Robotiq control through `GripperRemoteController`.
-- Add torque-clipping diagnostics and new trajectory collection, plotting, and system-identification examples.
+- Add new trajectory collection, plotting, and system-identification examples.

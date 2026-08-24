@@ -120,7 +120,6 @@ class FrankaController:
         self.running = False
         self.task = None
         self.clip = True
-        self._clip_stats_reset()
         self.error_callback = None  # Callback function(error_str) called on control loop exception
 
 
@@ -183,25 +182,6 @@ class FrankaController:
 
         self.q_desired = self.initial_qpos
         self.ee_desired = self.initial_ee
-
-    def _clip_stats_reset(self):
-        self._total_steps = 0
-        self._rate_clip_count = 0
-        self._torque_clip_count = 0
-        self._rate_clip_mag_sum = 0.0   # sum of max |diff| when clipped
-        self._torque_clip_mag_sum = 0.0  # sum of max |tau| when clipped
-
-    def _clip_stats_print(self):
-        if self._total_steps == 0:
-            return
-        rate_pct = 100.0 * self._rate_clip_count / self._total_steps
-        torque_pct = 100.0 * self._torque_clip_count / self._total_steps
-        rate_avg = self._rate_clip_mag_sum / self._rate_clip_count if self._rate_clip_count else 0
-        torque_avg = self._torque_clip_mag_sum / self._torque_clip_count if self._torque_clip_count else 0
-        print(f"\n--- Clipping Summary ({self._total_steps} steps) ---")
-        print(f"  Torque rate clipped: {self._rate_clip_count}/{self._total_steps} ({rate_pct:.1f}%) | avg max |diff|: {rate_avg:.1f} (limit: {self.torque_diff_limit:.1f})")
-        print(f"  Torque limit clipped: {self._torque_clip_count}/{self._total_steps} ({torque_pct:.1f}%) | avg max |tau|: {torque_avg:.1f}")
-        print(f"--------------------------------------")
 
     def _update_desired(self, desired):
         """
@@ -374,14 +354,6 @@ class FrankaController:
                     self.error_callback(error_str)
                 except Exception as cb_err:
                     print(f"Error in error_callback: {cb_err}")
-            # diff = (self.torque - self.last_torque)/1e-3
-            # diff = np.abs(diff)
-
-            # if np.any(diff > 1000.):
-            #     # print what axis is causing the issue
-            #     arg_idxs = np.where(diff > 1000.)[0]
-            #     print(f"High torque rate of change detected on axes: {arg_idxs}")
-            #     print((self.torque - self.last_torque)/1e-3) 
             sys.exit(1)  # Kill the entire script
     
     async def start(self):
@@ -416,7 +388,6 @@ class FrankaController:
         """
 
         logger.info("Starting robot control loop")
-        self._clip_stats_reset()
         self.robot.start()
 
         if self.task is None or self.task.done():
@@ -454,7 +425,6 @@ class FrankaController:
             except asyncio.CancelledError:
                 print("Control loop task cancelled.")
 
-        self._clip_stats_print()
         self.robot.stop()
         print("robot stopped")
         await asyncio.sleep(1)  # Yield to ensure the task starts
@@ -649,28 +619,11 @@ class FrankaController:
         
         # make sure torque rate of change is not too high
         if self.clip:
-            self._total_steps += 1
-
             diff = (tau_d - last_torque)/1e-3
-            clipped_diff = np.clip(diff, -self.torque_diff_limit, self.torque_diff_limit)
-            if not np.array_equal(diff, clipped_diff):
-                self._rate_clip_count += 1
-                max_diff = np.max(np.abs(diff))
-                self._rate_clip_mag_sum += max_diff
-                if self._rate_clip_count % 1 == 0:
-                    avg = self._rate_clip_mag_sum / self._rate_clip_count
-                    print(f"[clip] torque rate clipped {self._rate_clip_count}x / {self._total_steps} steps ({100.*self._rate_clip_count/self._total_steps:.1f}%) | avg max |diff|: {avg:.1f} (limit: {self.torque_diff_limit:.1f})")
-            tau_d = last_torque + clipped_diff * 1e-3
+            diff = np.clip(diff, -self.torque_diff_limit, self.torque_diff_limit)
+            tau_d = last_torque + diff * 1e-3
 
-            tau_d_clipped = np.clip(tau_d, -self.torque_limit, self.torque_limit)
-            if not np.array_equal(tau_d, tau_d_clipped):
-                self._torque_clip_count += 1
-                max_tau = np.max(np.abs(tau_d))
-                self._torque_clip_mag_sum += max_tau
-                if self._torque_clip_count % 1 == 0:
-                    avg = self._torque_clip_mag_sum / self._torque_clip_count
-                    print(f"[clip] torque limit clipped {self._torque_clip_count}x / {self._total_steps} steps ({100.*self._torque_clip_count/self._total_steps:.1f}%) | avg max |tau|: {avg:.1f}")
-            tau_d = tau_d_clipped
+            tau_d = np.clip(tau_d, -self.torque_limit, self.torque_limit)
             
         self.torque = tau_d
 
@@ -753,4 +706,3 @@ class FrankaController:
         print()
 
         # await self.stabilize()
-
