@@ -1,0 +1,38 @@
+<mujoco model="pocky_stick">
+  <compiler angle="radian" meshdir="." autolimits="true"/>
+
+  <default>
+    <default class="visual">
+      <geom type="mesh" contype="0" conaffinity="0" group="2"/>
+    </default>
+  </default>
+
+  <asset>
+    <material name="stick_gray" rgba="0.627451 0.627451 0.643137 0.5" specular="0.35" shininess="0.45"/>
+    <material name="stick_red" rgba="0.8 0.1 0.1 1" specular="0.35" shininess="0.45"/>
+    <mesh name="stick_mesh" file="stick.obj"/>
+  </asset>
+
+  <worldbody>
+    <body name="stick" gravcomp="1">
+
+      <!-- add visual small indicator for xyz axis -->
+      <geom name="stick_xyz_indicator" size="0.01" pos="0 0 0"/>
+      <!-- xaxis -->
+        <geom name="stick_xaxis" type="cylinder" size="0.001 0.02" pos="0.02 0 0" euler="0 1.5708 0" material="stick_red"/>
+        <!-- yaxis -->
+        <geom name="stick_yaxis" type="cylinder" size="0.001 0.02" pos="0 0.0 0.02" euler="0 0 1.5708" material="stick_red"/>
+        <!-- zaxis -->
+        <geom name="stick_zaxis" type="cylinder" size="0.001 0.02" pos="0 0.02 0" euler="1.5708 0 0" material="stick_red"/>
+
+      <geom name="stick_visual" class="visual" mesh="stick_mesh" pos="0 0 0.005" material="stick_gray"/>
+
+      <!-- Add primitive collision geoms here. -->
+      <!-- cylinder in z direction, 20mm, 15mm radius -->
+    <geom name="stick_collision" type="cylinder" size="0.015 0.07" pos="0 0 0.076" material="stick_red"/>
+    <!-- and then a sphere -->
+    <geom name="stick_collision_sphere" type="sphere" size="0.015" pos="0 0 0.146" material="stick_red"/>
+          <site name="stick_tip" pos="0 0 0.16" size="0.005" material="stick_red"/>
+    </body>
+  </worldbody>
+</mujoco>

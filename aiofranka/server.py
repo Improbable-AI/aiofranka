@@ -51,6 +51,55 @@ _TARGET_ATTRS = {
 }
 
 
+class ControlPreparationError(RuntimeError):
+    """Host scheduling or local warmup failed before torque control started."""
+
+
+def _select_rt_cpu():
+    """Prefer an allowed performance core, or honor an explicit CPU override."""
+    allowed = (set(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity")
+               else set(range(os.cpu_count() or 1)))
+    if not allowed:
+        raise ValueError("No CPUs are available to the control thread")
+    requested = os.environ.get("AIOFRANKA_RT_CPU")
+    if requested is not None:
+        try:
+            cpu = int(requested)
+        except ValueError as exc:
+            raise ValueError("AIOFRANKA_RT_CPU must be an integer CPU ID") from exc
+        if cpu not in allowed:
+            raise ValueError(f"AIOFRANKA_RT_CPU={cpu} is outside allowed CPUs {sorted(allowed)}")
+        return cpu
+    performance = set()
+    try:
+        with open("/sys/bus/event_source/devices/cpu_core/cpus") as source:
+            for entry in source.read().strip().split(","):
+                first, separator, last = entry.partition("-")
+                start = int(first)
+                performance.update(range(start, int(last) + 1) if separator else (start,))
+    except (OSError, ValueError):
+        performance.clear()
+    return max(allowed & performance or allowed)
+
+
+def _configure_realtime():
+    """Set this control thread's scheduling before opening the torque stream."""
+    cpu = _select_rt_cpu()  # Invalid explicit configuration must fail before robot.start().
+    try:
+        os.sched_setaffinity(0, {cpu})
+        logger.info("Control loop pinned to CPU %d", cpu)
+    except Exception as exc:
+        logger.warning("Could not pin to CPU %d: %s", cpu, exc)
+    try:
+        os.sched_setscheduler(0, os.SCHED_FIFO, os.sched_param(80))
+        logger.info("Control loop set to SCHED_FIFO priority 80")
+    except PermissionError:
+        logger.warning("Could not set SCHED_FIFO (no permission) — run with CAP_SYS_NICE")
+    except Exception as exc:
+        logger.warning("Could not set SCHED_FIFO: %s", exc)
+    return cpu
+
+
 class ServerController(FrankaController):
     """FrankaController subclass that writes state to shared memory each step.
 
@@ -62,6 +111,9 @@ class ServerController(FrankaController):
         super().__init__(robot)
         self._shm = shm_block
         self._last_error = None
+        self._step_attempts = self._completed_steps = 0
+        self._last_step_elapsed_s = self._max_step_elapsed_s = 0.0
+        self._last_robot_mode = self._last_control_command_success_rate = None
 
         # Pre-allocate reusable buffers to avoid per-iteration allocations
         model = robot.model
@@ -81,6 +133,8 @@ class ServerController(FrankaController):
         # Sync MuJoCo with real robot state (readOnce blocks for 1kHz tick)
         if robot.real:
             robot_state, _ = robot.torque_controller.readOnce()
+            self._last_robot_mode = getattr(robot_state, "robot_mode", None)
+            self._last_control_command_success_rate = getattr(robot_state, "control_command_success_rate", None)
             data.qpos[:] = robot_state.q
             data.qvel[:] = robot_state.dq
             data.ctrl[:] = robot_state.tau_J_d
@@ -132,13 +186,24 @@ class ServerController(FrankaController):
         self._shm.write_state(full_state)
         self._shm.write_ctrl_type(self.type)
 
+    def _warmup_control_math(self):
+        from aiofranka.control_warmup import warmup_control_math
+        return warmup_control_math(self, iterations=100)
+
     async def start(self):
         """Override start() to run robot.start() in a thread with timeout.
 
-        pylibfranka's start_torque_control() can hang or segfault after a
-        reflex error. Running it in a thread prevents it from killing the
-        entire server process.
+        Scheduling setup, native-math warmup, and startup logging finish before
+        the torque stream opens. The worker provides a timeout for blocking
+        startup; a native crash can still terminate the server process.
         """
+        try:
+            _configure_realtime()
+            logger.info("Warming up control math before torque startup...")
+            warmup = self._warmup_control_math()
+            logger.info("Control math warmup complete: %s", warmup)
+        except Exception as exc:
+            raise ControlPreparationError(f"Control preparation failed: {exc}") from exc
         loop = asyncio.get_event_loop()
         logger.info("Starting torque control...")
         try:
@@ -155,37 +220,34 @@ class ServerController(FrankaController):
 
     async def _run(self):
         """Override _run to NOT sys.exit(1) — let the server handle recovery."""
-        # Pin to last CPU core for cache locality
-        n_cpus = os.cpu_count() or 1
-        rt_core = n_cpus - 1
-        try:
-            os.sched_setaffinity(0, {rt_core})
-            logger.info(f"Control loop pinned to CPU {rt_core}")
-        except Exception as e:
-            logger.warning(f"Could not pin to CPU {rt_core}: {e}")
-        # Elevate to SCHED_FIFO real-time priority
-        try:
-            os.sched_setscheduler(0, os.SCHED_FIFO, os.sched_param(80))
-            logger.info("Control loop set to SCHED_FIFO priority 80")
-        except PermissionError:
-            logger.warning("Could not set SCHED_FIFO (no permission) — run with CAP_SYS_NICE")
-        except Exception as e:
-            logger.warning(f"Could not set SCHED_FIFO: {e}")
-
         self.running = True
         try:
             while self.running:
-                t0 = time.time()
-                self.step()
-                dt = time.time() - t0
+                t0 = time.perf_counter()
+                self._step_attempts += 1
+                try:
+                    self.step()
+                    self._completed_steps += 1
+                finally:
+                    dt = time.perf_counter() - t0
+                    self._last_step_elapsed_s = dt
+                    if dt > self._max_step_elapsed_s:
+                        self._max_step_elapsed_s = dt
                 if not self.robot.real:
-                    await asyncio.sleep(1/1000. - dt)
+                    await asyncio.sleep(max(0.0, 1/1000. - dt))
                 else:
                     await asyncio.sleep(0)
         except Exception as e:
             self.running = False
             self._last_error = str(e)
-            logger.error(f"Control loop error: {self._last_error}")
+            logger.error(
+                "Control loop error: %s; controller=%s; completed_steps=%d; attempted_steps=%d; "
+                "last_step_ms=%.3f; max_step_ms=%.3f (elapsed includes robot read wait); "
+                "last_robot_mode=%s; last_control_command_success_rate=%s",
+                self._last_error, self.type, self._completed_steps, self._step_attempts,
+                self._last_step_elapsed_s * 1000, self._max_step_elapsed_s * 1000,
+                self._last_robot_mode, self._last_control_command_success_rate,
+            )
             self._shm.write_error(self._last_error)
             if self.error_callback is not None:
                 try:
@@ -1143,6 +1205,8 @@ async def _run_server(robot_ip: str, unlock: bool = True,
                 if attempt == 0:
                     logger.info("Starting control loop")
                     ctrl_task = await controller.start()
+                    if controller._last_error or not controller.running:
+                        break  # Failed during startup wait; preserve error and do not home/retry.
 
                     # Move to default pose and hold
                     if home:
@@ -1211,6 +1275,8 @@ async def _run_server(robot_ip: str, unlock: bool = True,
                     ctrl_task = await controller.start()
                     progress(total_steps, "Starting 1kHz control loop")
 
+                if controller._last_error or not controller.running:
+                    break  # A startup failure must never be republished as RUNNING.
                 shm.write_status(STATUS_RUNNING)
                 await ctrl_task
                 break  # clean exit (user stopped the controller)
@@ -1222,6 +1288,8 @@ async def _run_server(robot_ip: str, unlock: bool = True,
                     f"Control loop error (attempt {attempt + 1}/{max_retries + 1}): {e}"
                 )
                 shm.write_error(str(e))
+                if isinstance(e, ControlPreparationError):
+                    break  # Local preparation errors cannot be fixed by robot recovery/retries.
                 if cmd_handler._should_stop or shutdown_requested:
                     break  # user requested stop, don't retry
                 if "Reflex" in str(e):

@@ -646,8 +646,11 @@ class FrankaController:
             - Uses Ruckig for smooth, time-optimal trajectories
             - Respects velocity, acceleration, and jerk limits
             - Switches to impedance control automatically
-            - Executes trajectory at 50 Hz (20ms updates)
+            - Executes at 50 Hz with a fresh clock, independent of set_freq()
+            - A late update slows the move rather than sending catch-up commands
+            - Sends the exact joint endpoint before returning
             - Duration depends on distance and limits
+            - Uses the active control loop's cached joint state; never reads hardware here
             
         Trajectory Limits:
             - Max velocity: 10 rad/s per joint
@@ -673,11 +676,17 @@ class FrankaController:
             - Switches to impedance mode (resets controller state)
             - May fail if target is at joint limits or in collision
         """
-        self.type = "impedance"
+        # Only the control loop may read the active torque controller. Calling
+        # robot.state here would consume extra readOnce() ticks without writes.
+        with self.state_lock:
+            if self.state is None:
+                raise RuntimeError("No cached robot state; start the controller before move()")
+            current_qpos = np.array(self.state['qpos'], copy=True)
+            current_qvel = np.array(self.state['qvel'], copy=True)
 
         inp = InputParameter(7)
-        inp.current_position = self.robot.state['qpos']
-        inp.current_velocity = self.robot.state['qvel']
+        inp.current_position = current_qpos
+        inp.current_velocity = current_qvel
         inp.current_acceleration = np.zeros(7)
 
         inp.target_position = np.array(qpos)
@@ -693,16 +702,34 @@ class FrankaController:
 
         otg.calculate(inp, trajectory)
 
-        # create a trajectory to the desired qpos  (linear interpolation)
-        n_steps = int(trajectory.duration * 50)
-        eta_total = trajectory.duration
-        for i in range(n_steps):
-            q_desired, _, _ = trajectory.at_time(i / 50.0)
-            await self.set("q_desired", q_desired)
-            done = (i + 1) * 20 // n_steps
-            bar = "█" * done + "░" * (20 - done)
-            eta = eta_total - (i + 1) / 50.0
-            print(f"\r  Moving [{bar}] {(i + 1) * 100 // n_steps}% ETA {eta:.1f}s", end="", flush=True)
-        print()
+        # Install a measured-position hold before exposing impedance mode, so
+        # its first cycle cannot use a joint target left over from another mode.
+        with self.state_lock:
+            self.q_desired = current_qpos.copy()
+            self.type = "impedance"
 
-        # await self.stabilize()
+        # A move owns its clock. Reusing set()'s deadline after a pause would
+        # emit an entire trajectory while trying to catch up with the old time.
+        self._last_update_time.pop("q_desired", None)
+        n_steps = int(np.ceil(trajectory.duration * 50))
+        next_update = time.perf_counter()
+        try:
+            for i in range(n_steps + 1):
+                if i:
+                    await asyncio.sleep(max(0., next_update - time.perf_counter()))
+                stamp = min(i / 50., trajectory.duration)
+                q_desired = (np.array(inp.target_position) if i == n_steps
+                             else np.array(trajectory.at_time(stamp)[0]))
+                with self.state_lock:
+                    self.q_desired = q_desired
+                # Rebase after each actual write: a late wake must not cause
+                # following samples to be issued together to recover lost time.
+                next_update = time.perf_counter() + 1 / 50.
+                done = 20 if not n_steps else i * 20 // n_steps
+                bar = "█" * done + "░" * (20 - done)
+                percent = 100. if not n_steps else i * 100 / n_steps
+                eta = trajectory.duration - stamp
+                print(f"\r  Moving [{bar}] {percent:.0f}% ETA {eta:.1f}s", end="", flush=True)
+            print()
+        finally:
+            self._last_update_time.pop("q_desired", None)

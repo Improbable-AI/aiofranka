@@ -49,13 +49,19 @@ class ServerDiedError(RuntimeError):
         lines = [
             f"\n  {_RED}Server died:{_RST} {server_error}\n",
         ]
-        if "reflex" in server_error.lower():
-            lines.append(f"  The robot entered {_BOLD}Reflex{_RST} mode (safety stop).")
-            lines.append(f"  This usually means the robot hit a joint/velocity/torque limit.\n")
-        lines.append(f"  To recover:")
-        lines.append(f"    1. Run {_BOLD}aiofranka gravcomp{_RST} to freely move the robot")
-        lines.append(f"       to a safe configuration, then Ctrl+C and restart your script.")
-        lines.append(f"    2. Or just restart your script (it will auto-recover if possible).\n")
+        if "communication_constraints_violation" in server_error.lower():
+            lines.append("  The 1 kHz robot control communication missed its timing requirements.")
+            lines.append("  Possible causes include host scheduling/load or network latency/packet loss.\n")
+            lines.append("  Check real-time scheduling, host load, and the robot network connection")
+            lines.append("  before restarting the controller.\n")
+        else:
+            if "reflex" in server_error.lower():
+                lines.append(f"  The robot entered {_BOLD}Reflex{_RST} mode (safety stop).")
+                lines.append(f"  This usually means the robot hit a joint/velocity/torque limit.\n")
+            lines.append(f"  To recover:")
+            lines.append(f"    1. Run {_BOLD}aiofranka gravcomp{_RST} to freely move the robot")
+            lines.append(f"       to a safe configuration, then Ctrl+C and restart your script.")
+            lines.append(f"    2. Or just restart your script (it will auto-recover if possible).\n")
         super().__init__("\n".join(lines))
 
 

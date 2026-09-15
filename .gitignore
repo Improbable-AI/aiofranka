@@ -43,3 +43,8 @@ rss2026/
 checkpoints/
 examples/sysid_*
 examples/TEST_*
+
+# Generated camera sessions and MuJoCo diagnostics
+/camera_calibration/
+/MUJOCO_LOG.TXT
+.DS_Store

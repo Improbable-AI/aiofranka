@@ -44,6 +44,11 @@ robotiq = [
     "minimalmodbus",
     "pyrobotiqgripper",
 ]
+t-pushing = [
+    "opencv-contrib-python>=4.8,<5",
+    "aprilcube>=0.3,<0.4",
+    "pyspacemouse>=2,<3",
+]
 
 [project.urls]
 Homepage = "https://github.com/Improbable-AI/aiofranka"

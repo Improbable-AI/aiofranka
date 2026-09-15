@@ -1,5 +1,49 @@
-import pyspacemouse
+"""SpaceMouse input helpers; importing this module does not open HID devices."""
+
+from types import SimpleNamespace
+
 import numpy as np
+
+
+def open_spacemouse():
+    """Open nonblocking input with the axis convention used by existing teleop."""
+    try:
+        import pyspacemouse
+    except ImportError as exc:
+        raise RuntimeError("Install SpaceMouse support: python -m pip install 'pyspacemouse>=2,<3'") from exc
+    legacy = getattr(getattr(pyspacemouse, "AxisConvention", None), "LEGACY", None)
+    options = {"axis_convention": legacy} if legacy is not None else {}
+    return pyspacemouse.open(nonblocking=True, **options)
+
+
+def read_latest_state(device, max_reads=256):
+    """Drain nonblocking PySpaceMouse 2.x public reads and copy the final state.
+
+    Each public read parses one queued report, combining split axis and button
+    reports into the device's state. Its timestamp stops changing when no report
+    remains. The library mutates that same state object, so save its timestamp
+    before reading again. Never read the private HID handle: that drops reports.
+
+    ``max_reads`` includes the final empty-queue probe. If the queue cannot drain
+    within this bound, raise instead of returning a potentially stale command.
+    The caller must open the device in nonblocking mode (the 2.x default).
+    """
+    if not isinstance(max_reads, int) or max_reads < 2:
+        raise ValueError("max_reads must be an integer of at least two")
+    state = device.read()
+    for _ in range(max_reads - 1):
+        previous_t = float(state.t)
+        if not np.isfinite(previous_t):
+            raise ValueError("SpaceMouse sent a nonfinite timestamp")
+        state = device.read()
+        if state.t == previous_t:
+            names = ("x", "y", "z", "roll", "pitch", "yaw")
+            axes = np.array([getattr(state, name) for name in names], dtype=float)
+            if not np.isfinite(axes).all():
+                raise ValueError("SpaceMouse sent nonfinite axes")
+            return SimpleNamespace(t=previous_t, **dict(zip(names, axes)),
+                                   buttons=list(state.buttons))
+    raise RuntimeError(f"SpaceMouse input queue did not drain within {max_reads} reads")
 
 
 class SpaceMouse:
@@ -7,6 +51,10 @@ class SpaceMouse:
 
     Without draining, stale HID reports queue up in the kernel buffer and
     cause the robot to keep moving after the spacemouse is released.
+
+    Scale and clip arguments remain available as attributes for callers.
+    read() returns raw normalized axes and does not apply those attributes;
+    the teleoperation loop applies its own translation scale.
 
     Args:
         translation_scale: Multiplier for translation deltas (m per axis unit).
@@ -28,7 +76,7 @@ class SpaceMouse:
         self.rotation_scale = rotation_scale
         self.rotation_clip = rotation_clip
         self.yaw_only = yaw_only
-        self._device = pyspacemouse.open().__enter__()
+        self._device = open_spacemouse().__enter__()
 
     def read(self):
         """Read the latest spacemouse state, draining any buffered HID reports.
@@ -36,13 +84,11 @@ class SpaceMouse:
         Returns:
             (translation_raw, rotation_raw, buttons):
                 translation_raw: np.ndarray (3,) raw normalized axes [-1, 1].
-                rotation_raw: np.ndarray (3,) raw euler angles (degrees),
-                    respecting yaw_only setting.
+                rotation_raw: np.ndarray (3,) normalized rotation axes,
+                    respecting the original signs and yaw_only setting.
                 buttons: list[int] button states from the latest event.
         """
-        event = self._device.read()
-        while self._device._device.read(self._device._info.bytes_to_read):
-            event = self._device.read()
+        event = read_latest_state(self._device)
 
         translation_raw = np.array([event.x, event.y, event.z])
 
