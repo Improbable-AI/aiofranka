@@ -16,7 +16,11 @@ The optional extra installs OpenCV contrib, AprilCube 0.3, and PySpaceMouse 2.x.
 
 MuJoCo image exports use EGL by default and require a working EGL driver. `MUJOCO_GL=osmesa` selects software rendering when OSMesa is installed. The isolated rendering integration test explicitly requires EGL. Run the offline checks with `python -m unittest discover -s tests -p 'test_*.py'`; no robot, camera, or SpaceMouse is opened.
 
-The confirmed stick tip is `[0, 0, 0.161]` meters from `attachment_site`. Each episode samples a new initial tip XY position more than 0.05 meters and at most 0.10 meters outside the relocated T-block's nearest boundary. Sampling is uniform over that area, using the exact T outline. The distance refers to the tip's XY point. Tip height is table height + 0.020 meters. Orientation stays fixed with the stick pointing down. Raw SpaceMouse X/Y control robot-base X/Y; Z and all rotation inputs are ignored.
+Collection records two goal poses, A and B, and alternates demonstrations A→B, B→A, A→B. The robot goes home and starts the next approach automatically after each episode.
+
+The confirmed stick tip is `[0, 0, 0.161]` meters from `attachment_site`. Each direction reuses a fixed tip start **7.5 cm outside the recorded source T outline**: saved A for A→B, saved B for B→A. The start uses the outline vertex farthest away from the destination along the line between the saved pose centers, then offsets outward by 7.5 cm. Tied vertices use a stable first choice. This gives the requested 5–10 cm clearance without random sampling. If A and B have the same XY center, the outward direction is robot-base −Y. Live tracking noise and the current block position do not shift the point for a selected direction.
+
+`--start-clearance` changes this fixed outline clearance (meters, default 0.075). It measures the tip's XY point relative to the saved source outline. Tip height stays at the fixed table height + 0.020 meters, with the stick pointing down. Raw SpaceMouse X/Y control robot-base X/Y; Z and all rotation inputs are ignored.
 
 ## T-block pose detection
 
@@ -54,10 +58,11 @@ These commands open no robot, camera, or HID device:
 
 ```bash
 python examples/14_collect_t_pushing.py inspect
-python examples/14_collect_t_pushing.py plan --goal-pose /path/to/run/setup.json --object-pose /path/to/episode/setup.json --seed 42
+python examples/14_collect_t_pushing.py plan --resume /path/to/run
+python examples/14_collect_t_pushing.py plan --goal-pose /path/to/run/setup.json --object-pose /path/to/episode/setup.json
 ```
 
-`plan` also accepts a JSON 4×4 `T_base_goal` matrix. `--object-pose` supplies the relocated object pose (a 4×4 matrix or saved episode setup). If omitted, the goal pose is used as an explicitly labeled preview object. It samples one start and solves its joint endpoint from the home posture with the supplied MuJoCo model. It does not check collisions or intermediate path clearance. `--seed` makes the sampling reproducible; collection uses one random generator for the whole run.
+`plan` takes a saved run or episode setup containing both goals and the fixed table height. A run setup previews A→B; an episode setup previews its saved direction. It inherits the saved start clearance, home joints, and tool offset, with explicit CLI overrides allowed. `--object-pose` supplies an example current pose (a 4×4 matrix or saved episode setup) to simulate resume direction selection. That pose selects A→B or B→A but does not shift the corresponding fixed start. The same geometry helper and IK compute collection and preview endpoints. This checks neither collisions nor intermediate path clearance.
 
 ## A physical run, when ready
 
@@ -74,33 +79,35 @@ To append to an existing run after a stop, pass its directory:
 python examples/14_collect_t_pushing.py collect --resume /path/to/data/t_pushing/RUN
 ```
 
-Resume inherits the saved robot IP, condition, scale, sampling distances, tool geometry, home pose, gains, timing, and success threshold. It uses the run's copied calibration and target configuration, plus its existing goal and table height, and skips goal capture. The robot goes home and waits for the usual object-placement Enter prompt. Existing episode directories, including failed or unfinished ones, are preserved; numbering continues after the highest existing index. `--episodes N` collects N additional episodes. Explicit collection flags can override inherited settings; calibration, target config, and condition stay pinned to the run. Use a new run if the camera or table placement has changed.
+Resume inherits the saved robot IP, condition, scale, fixed start clearance, tool geometry, home pose, gains, timing, and success threshold. It uses the run's copied calibration and target configuration, plus its saved goals A/B and table height, and skips goal capture. After moving home, it captures the current native AprilCube pose and selects the opposite destination: if the block matches A, push to B; if it matches B, push to A. Matching compares footprint overlap first, then XY distance when coverage is equal (including when neither goal overlaps). An exact tie selects A as the source. Previous episode outcomes and numbering do not determine this first resumed direction. The selected direction uses its fixed start from the recorded source geometry. There is no Enter prompt on resume.
 
-Each resumed invocation writes `resume_NNNN.json` with its effective settings, first episode, random seed, and outcome. The original `run.json`, goal reference, setup, and earlier episodes remain unchanged. New episode setups identify their `run_attempt`. A resumed seeded invocation uses `[seed, first_episode]` as its random seed material to avoid replaying the original initial draws. `inspect --resume RUN` checks the saved inputs and prints the next episode without opening any devices.
+Existing episode directories, including failed or unfinished ones, are preserved; numbering continues after the highest existing index. `--episodes N` collects N additional episodes. Explicit collection flags can override inherited settings; calibration, target config, and condition stay pinned to the run. Use a new run if the camera or table placement has changed. Old single-goal runs lack the required A/B pair: this collector reports that a new A/B run is needed when asked to resume one.
+
+Each resumed invocation writes `resume_NNNN.json` with its effective settings, first episode, and outcome. The original `run.json`, goal references, setup, and earlier episodes remain unchanged. New episode setups identify their `run_attempt`. Earlier A/B runs that used sampled starts can resume: new episodes use the fixed 7.5 cm default (or explicit `--start-clearance`), and their metadata records the new initialization policy. Old sampling distances and seeds no longer apply. `inspect --resume RUN` checks the saved inputs and prints the next episode number without opening any devices; its direction is selected only during collection from the live pose.
 
 If you relocate the dataset or checkout, override the saved absolute model paths with `--robot-xml /path/to/aiofranka/model/fr3.xml --stick-xml /path/to/assets/pocky/stick.xml`.
 
-1. Place the T-block flat at the desired goal, remove your hands, and press Enter. The next valid native AprilCube pose fixes the goal. There is no extra sample window or motion, tilt, or tag-count gate. Assuming your placement is flat, table height is the object's center Z minus 32 mm (half its 64 mm local-Y thickness). The same direct pose capture is used after relocating the T for each episode.
-2. The robot moves directly to the default Franka joint pose. It stays parked until you randomize the T-block and press Enter.
-3. The camera measures the relocated T pose. A new tip XY point is sampled 5–10 cm outside its outline and saved with the episode. One joint-space move goes directly to the sampled start at table height + 2 cm. It switches to OSC for SpaceMouse XY pushing.
-4. An episode succeeds as soon as more than 85% of the goal's actual T-shaped area is covered. There is no dwell time or minimum frame count. This is intersection/goal area, not bounding-box overlap or IoU. No finish key is needed. The robot moves directly home for the next manual object reset.
+1. Place the T-block flat at A and press Enter, then repeat at B. Each goal uses the next valid native AprilCube pose. There is no extra sample window or motion, tilt, or tag-count gate. Table height is inferred once from A: the object's center Z minus 32 mm (half its 64 mm local-Y thickness). Both goals use that same fixed table height.
+2. The robot moves directly to the default Franka joint pose. For a new run, place the block back at A and press Enter once to begin A→B. Capturing A followed by B leaves the block at B, so this initial placement is needed.
+3. The camera measures the current T pose for recording. One joint-space move goes directly to the direction's fixed start at table height + 2 cm. It switches to OSC for SpaceMouse XY pushing.
+4. An episode succeeds as soon as more than 85% of its destination's actual T-shaped area is covered. There is no dwell time or minimum frame count. This is intersection/goal area, not bounding-box overlap or IoU. After the success is saved, the destination switches: B→A follows A→B, then A→B again. The robot goes directly home and automatically approaches the next direction's fixed start. Leave the block where the previous demonstration ended; there is no manual reset or Enter prompt between episodes.
 
-One process keeps one goal and table height. Restart for the other table condition. Enter starts episodes only; `q` at a boundary ends the run. Ctrl+C interrupts at any time. A 300-second episode timeout is saved as `timeout`, then resets normally.
+One run keeps its A/B pair and table height. Start another run for the other table condition. `q` cancels at a startup prompt; Ctrl+C interrupts at any time. `--episodes N` ends after N episode attempts. A 300-second episode timeout is saved as `timeout`, then the robot goes home and retries the same destination from the block's current pose. Only success switches destinations within a process. On resume, live pose matching selects the destination again.
 
-All automatic positioning uses `robot.move(q)` in joint impedance mode. IK selects the start endpoint; interpolation happens in joint space, so the tip does not follow an exact vertical or straight Cartesian path. The sequence is episode end → home → sampled start, with no separate raise/lower waypoints. Each move starts its own 50 Hz command schedule and sends the exact final joint target; pauses between moves do not cause trajectory samples to be sent in a burst. A one-second pause follows each move. The terminal labels each phase and prints its target and measured tip coordinates. The Enter prompt after home waits indefinitely. `--home-q` selects the home posture.
+All automatic positioning uses `robot.move(q)` in joint impedance mode. IK selects the start endpoint; interpolation happens in joint space, so the tip does not follow an exact vertical or straight Cartesian path. The sequence is episode end → home → fixed start, with no separate raise/lower waypoints. Each move starts its own 50 Hz command schedule and sends the exact final joint target; pauses between moves do not cause trajectory samples to be sent in a burst. A one-second pause follows each move. The terminal labels each episode's direction and prints its target and measured tip coordinates. `--home-q` selects the home posture.
 
 Custom collision/path clearance checks, home-height rejection, approach-zone checks, and measured tip-height/orientation/workspace aborts have been removed. Choose the layout and home posture yourself. Normal controller limits remain in aiofranka/libfranka. The camera continues recording detected poses when the object tilts or lifts; this does not change the run's fixed table height. Goal coverage uses the T footprint projected into base XY.
 
 When AprilCube returns no pose, the object pose and goal coverage are recorded as null. SpaceMouse control and camera/robot recording continue. Native valid results are used without an additional pose-age cutoff, and the same coverage value displayed and recorded determines success. There is no tracking-loss hold or timeout. Camera backend, recording, and controller errors still end the run and preserve partial data. Joint `move()` uses aiofranka's blocking API.
 
-Useful options: `--calibration FILE`, `--output NEW_DIRECTORY`, `--episodes N`, `--scale METERS_PER_UNIT`, `--start-min-distance METERS` (default 0.05), `--start-distance METERS` (maximum distance outside the outline; default 0.10), `--seed INTEGER`, and `--stream rs_SERIAL_color`.
+Useful options: `--calibration FILE`, `--output NEW_DIRECTORY`, `--episodes N`, `--scale METERS_PER_UNIT`, `--start-clearance METERS` (default 0.075), and `--stream rs_SERIAL_color`. The old `--start-min-distance`, `--start-distance`, and `--seed` flags have been removed.
 
 ## Saved data
 
-Each run contains copied calibration and target configuration, `run.json`, `setup.json`, `goal.png`, and the goal detection. Each `episode_XXXX` contains:
+Each run contains copied calibration and target configuration, `run.json`, `setup.json`, `goal_A.png`, `goal_B.png`, and `goal_A_detection.json` / `goal_B_detection.json`. Run `setup.json` stores `T_base_goals` with keys `A` and `B`, and `T_base_goal` as the initial destination B. Each `episode_XXXX` contains:
 
-- `setup.json`: sampled tip position, its distance from the outline, the relocated T pose used for sampling, and the joint approach plan. This is saved before the approach.
-- `episode.json`: outcome, condition, goal, fixed height, sampled start, geometry, and record counts.
+- `setup.json`: active `T_base_goal`, nominal `source_goal` / `target_goal` labels, `direction` (`A_to_B` or `B_to_A`), fixed `start_tip_base_m`, `start_initialization` policy, distance from the saved source outline, actual tracked starting pose, and joint approach plan. This is saved before the approach. A timeout retry may find the object partway between the nominal endpoints, while reusing the same fixed tip start.
+- `episode.json`: outcome, condition, goal, fixed height, fixed start, geometry, and record counts.
 - `states.jsonl`: measured joints, velocities, EE/tip poses, torques, Jacobian/mass matrix, commanded targets, SpaceMouse input, coverage, and camera-frame references at nominal 50 Hz.
 - `camera.jsonl` and `rgb/*`: native-resolution frames, source timestamps, AprilCube pose results, native prediction flags, reprojection errors, and base-frame object poses, including frames with no pose.
 - `video.mp4` and `video.json`: plain RGB video plus source timing and frame mapping, generated after collection stops.
@@ -121,6 +128,8 @@ The existing records contain the requested observation history, goal, and absolu
 | Object planar angle | `atan2(T_base_object[1, 0], T_base_object[0, 0])` |
 | Goal XY and angle | Episode `setup.json`: `T_base_goal`, using the same translation and angle extraction |
 | Action: commanded target tip XY | `states.jsonl`: `target_tip_base_m[:2]` |
+
+Use the **episode's** `T_base_goal` for policy conditioning; it follows the active A/B destination. The run-level `T_base_goal` represents only the first intended destination, B.
 
 The angle is the direction of the object's local +X axis projected into base XY. Use that same convention at training and inference; representing it as `(cos(theta), sin(theta))` avoids the wrap at ±π. Histories can use consecutive control rows, which pair each command with the robot state and latest native object estimate used for that command. Missing poses are null, and `tracking_valid` / `tracking_predicted` identify availability and native predictions. Handle missing observations when building histories; they are not zero-valued object positions.
 

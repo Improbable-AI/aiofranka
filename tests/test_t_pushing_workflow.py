@@ -116,6 +116,9 @@ class TPushingWorkflowTest(unittest.TestCase):
         # Target thickness is local Y. Lay its +Y face upwards in robot base Z.
         self.goal[:3, :3] = [[1, 0, 0], [0, 0, -1], [0, 1, 0]]
         self.goal[:3, 3] = [.5, 0., .1 + self.shape.half_thickness_m]
+        self.source = self.goal.copy()
+        self.source[1, 3] -= .35
+        self.goals = {"A": self.source.tolist(), "B": self.goal.tolist()}
         self.result = {"T_base_camera": np.eye(4).tolist(),
                        "camera": {"serial": "test", "width": 640, "height": 480},
                        "camera_matrix": [[500., 0., 320.], [0., 500., 240.], [0., 0., 1.]],
@@ -124,7 +127,7 @@ class TPushingWorkflowTest(unittest.TestCase):
 
     def test_default_inspect_and_plan_open_no_robot_camera_or_hid(self):
         goal_file = self.directory / "setup.json"
-        goal_file.write_text(json.dumps({"T_base_goal": self.goal.tolist()}))
+        goal_file.write_text(json.dumps(self.ab_setup()))
         original_import = builtins.__import__
 
         def guarded(name, *args, **kwargs):
@@ -144,6 +147,74 @@ class TPushingWorkflowTest(unittest.TestCase):
             self.assertEqual(pushing.main(["plan", "--goal-pose", str(goal_file)]), 0)
             self.assertIsNone(motion.call_args.args[0])
             motion.return_value.plan_start.assert_called_once()
+
+    def test_offline_plan_matches_fixed_collection_start_and_saved_table_height(self):
+        setup = self.ab_setup()
+        setup["table_height_m"] = .123
+        goal_file, object_file = self.directory / "setup.json", self.directory / "object.json"
+        for saved_target, live_source, expected_target in ((None, None, "B"), ("A", None, "A"),
+                                                           ("A", "A", "B"), ("B", "B", "A")):
+            with self.subTest(saved_target=saved_target, live_source=live_source):
+                saved = dict(setup)
+                saved.pop("target_goal")
+                if saved_target:
+                    saved["target_goal"] = saved_target
+                goal_file.write_text(json.dumps(saved))
+                arguments = ["plan", "--goal-pose", str(goal_file)]
+                source = "B" if expected_target == "A" else "A"
+                current = np.asarray(self.goals[live_source or source]).copy()
+                current[:3, 3] += [.006, -.008, .009]
+                if live_source:
+                    object_file.write_text(json.dumps({"T_base_object": current.tolist()}))
+                    arguments += ["--object-pose", str(object_file)]
+                output = io.StringIO()
+                with redirect_stdout(output), \
+                        mock.patch.object(pushing, "load_calibration", return_value=(self.directory / "calibration.json", self.result)), \
+                        mock.patch.object(pushing.motion_code, "Kinematics", FakeKinematics), \
+                        mock.patch.object(pushing.motion_code, "Motion") as motion, \
+                        mock.patch.object(np.random, "default_rng", side_effect=AssertionError("Random initialization is removed")):
+                    motion.return_value.plan_start.side_effect = lambda xyz: {"tip": list(xyz), "start_q": [0.] * 7}
+                    self.assertEqual(pushing.main(arguments), 0)
+                printed = output.getvalue()
+                planned, _ = json.JSONDecoder().raw_decode(printed[printed.index("{"):])
+                collected = pushing.make_episode_setup(
+                    self.args, pushing.setup_for_goal(setup, expected_target), self.shape, current)
+                self.assertEqual(planned["target_goal"], expected_target)
+                self.assertEqual(planned["source_goal"], source)
+                self.assertAlmostEqual(planned["table_height_m"], .123)
+                self.assertAlmostEqual(planned["start_tip_base_m"][2], .143)
+                np.testing.assert_array_equal(planned["start_tip_base_m"], collected["start_tip_base_m"])
+                np.testing.assert_array_equal(motion.return_value.plan_start.call_args.args[0],
+                                              planned["start_tip_base_m"])
+
+    def test_plan_inherits_saved_initialization_and_geometry_but_explicit_flags_override(self):
+        saved = self.ab_setup()
+        saved["start_initialization"]["clearance_m"] = .09
+        saved["home_q"] = [.1, -.2, .3, -1.4, .5, 1.6, .7]
+        saved["tip_offset_ee_m"] = [.001, .002, .18]
+        goal_file = self.directory / "setup.json"
+        for wrapped in (False, True):
+            with self.subTest(metadata_wrapper=wrapped):
+                goal_file.write_text(json.dumps({"metadata": saved} if wrapped else saved))
+                arguments = ["plan", "--goal-pose", str(goal_file)]
+                inherited = pushing.parse_arguments(pushing.parser(), arguments)
+                self.assertEqual(inherited.start_clearance, .09)
+                self.assertEqual(inherited.home_q, saved["home_q"])
+                self.assertEqual(inherited.tip_offset, saved["tip_offset_ee_m"])
+                explicit = pushing.parse_arguments(pushing.parser(), arguments + [
+                    "--start-clearance", ".075", "--home-q", "0", "0", "0", "-1", "0", "1", "0",
+                    "--tip-offset", "0", "0", ".161"])
+                self.assertEqual(explicit.start_clearance, .075)
+                self.assertEqual(explicit.home_q, [0., 0., 0., -1., 0., 1., 0.])
+                self.assertEqual(explicit.tip_offset, [0., 0., .161])
+
+    def test_plan_rejects_legacy_scalar_or_matrix_goal_files_before_opening_devices(self):
+        goal_file = self.directory / "old_goal.json"
+        for saved in (0.5, self.goal.tolist()):
+            with self.subTest(saved=saved):
+                goal_file.write_text(json.dumps(saved))
+                with self.assertRaisesRegex(ValueError, "saved setup with goals A/B"):
+                    pushing.parse_arguments(pushing.parser(), ["plan", "--goal-pose", str(goal_file)])
 
     def test_latest_completed_calibration_is_pinned_and_bad_latest_is_not_skipped(self):
         def session(name):
@@ -179,13 +250,15 @@ class TPushingWorkflowTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, key):
                     pushing.validate_camera({**metadata, key: value}, self.result)
 
-    def test_run_setup_fixes_goal_height_tool_and_sampling_policy(self):
+    def test_run_setup_fixes_goal_height_tool_and_initialization_policy(self):
         setup = pushing.make_setup(self.args, self.result, self.shape, self.goal)
         self.assertAlmostEqual(setup["table_height_m"], .1)
         self.assertNotIn("start_tip_base_m", setup)
         self.assertNotIn("approach_plan", setup)
-        self.assertEqual(setup["start_sampling"], {"method": "uniform_area_outside_T_outline",
-                                                  "min_distance_m": .05, "max_distance_m": .1, "seed": None})
+        self.assertEqual(setup["start_initialization"], {
+            "method": "fixed_source_outline", "clearance_m": .075,
+            "side": "away_from_destination", "same_xy_fallback": "base_negative_y"})
+        self.assertNotIn("start_sampling", setup)
         self.assertEqual(setup["success_threshold"], .85)
         np.testing.assert_allclose(setup["tip_offset_ee_m"], [0., 0., .161])
         np.testing.assert_allclose(setup["R_base_ee"], np.diag([1., -1., -1.]))
@@ -195,28 +268,45 @@ class TPushingWorkflowTest(unittest.TestCase):
         elevated_setup = pushing.make_setup(self.args, self.result, self.shape, elevated)
         self.assertAlmostEqual(elevated_setup["table_height_m"], .25)
 
-    def test_episode_start_uses_relocated_outline_with_frozen_goal_and_height(self):
-        setup = pushing.make_setup(self.args, self.result, self.shape, self.goal)
+    def ab_setup(self, target="B"):
+        setup = pushing.make_setup(self.args, self.result, self.shape, self.source)
+        setup["T_base_goals"] = self.goals
+        return pushing.setup_for_goal(setup, target)
+
+    def test_episode_start_uses_saved_source_outline_despite_changed_live_pose(self):
+        setup = self.ab_setup()
         before = pushing.recording.json_value(setup)
-        initial = self.goal.copy()
+        initial = self.source.copy()
         initial[:3, 3] += [.15, .18, .25]
-        episode = pushing.make_episode_setup(self.args, setup, self.shape, initial, np.random.default_rng(17))
+        with mock.patch.object(np.random, "default_rng", side_effect=AssertionError("Random initialization is removed")):
+            episode = pushing.make_episode_setup(self.args, setup, self.shape, initial)
         np.testing.assert_array_equal(episode["initial_T_base_object"], initial)
         np.testing.assert_array_equal(episode["T_base_goal"], self.goal)
         self.assertEqual(episode["table_height_m"], setup["table_height_m"])
         self.assertAlmostEqual(episode["start_tip_base_m"][2], .12)
-        distance = self.shape.distance_xy(initial, episode["start_tip_base_m"][:2])
-        self.assertGreater(distance, .05)
-        self.assertLessEqual(distance, .10)
+        distance = self.shape.distance_xy(self.source, episode["start_tip_base_m"][:2])
+        self.assertAlmostEqual(distance, .075, places=6)
+        self.assertGreater(self.shape.distance_xy(initial, episode["start_tip_base_m"][:2]), .10)
+        self.assertLess(episode["start_tip_base_m"][1], self.source[1, 3])
         self.assertAlmostEqual(episode["start_outline_distance_m"], distance)
         self.assertEqual(pushing.recording.json_value(setup), before)
-        repeated = pushing.make_episode_setup(self.args, setup, self.shape, initial, np.random.default_rng(17))
+        repeated = pushing.make_episode_setup(self.args, setup, self.shape, initial)
         np.testing.assert_array_equal(repeated["start_tip_base_m"], episode["start_tip_base_m"])
         translated = initial.copy()
         translated[:2, 3] += [.4, -.3]
-        moved = pushing.make_episode_setup(self.args, setup, self.shape, translated, np.random.default_rng(17))
-        np.testing.assert_allclose(np.asarray(moved["start_tip_base_m"])[:2],
-                                   np.asarray(episode["start_tip_base_m"])[:2] + [.4, -.3])
+        translated[:3, :3] = np.diag([-1., -1., 1.]) @ translated[:3, :3]
+        moved = pushing.make_episode_setup(self.args, setup, self.shape, translated)
+        np.testing.assert_array_equal(moved["start_tip_base_m"], episode["start_tip_base_m"])
+        np.testing.assert_array_equal(moved["initial_T_base_object"], translated)
+
+    def test_reverse_leg_initializes_beside_saved_b_away_from_a(self):
+        forward = pushing.make_episode_setup(self.args, self.ab_setup("B"), self.shape, self.source)
+        reverse = pushing.make_episode_setup(self.args, self.ab_setup("A"), self.shape, self.source)
+        np.testing.assert_array_equal(reverse["T_base_goal"], self.source)
+        self.assertEqual(reverse["source_goal"], "B")
+        self.assertAlmostEqual(self.shape.distance_xy(self.goal, reverse["start_tip_base_m"][:2]), .075, places=6)
+        self.assertGreater(reverse["start_tip_base_m"][1], self.goal[1, 3])
+        self.assertNotEqual(reverse["start_tip_base_m"], forward["start_tip_base_m"])
 
     def test_success_stops_at_first_native_pose_above_threshold_even_with_latency(self):
         robot, motion, kin, mouse, tracker, setup, writer, rows = self.episode_fakes()
@@ -269,25 +359,24 @@ class TPushingWorkflowTest(unittest.TestCase):
         released, _ = pushing.osc_xy_target(unbounded, [0., 0.], .05)
         np.testing.assert_array_equal(released, unbounded)
 
-    def test_sampling_arguments_replace_fixed_start_and_have_no_workspace(self):
-        self.assertEqual(self.args.start_min_distance, .05)
-        self.assertEqual(self.args.start_distance, .1)
-        self.assertIsNone(self.args.seed)
-        for removed in ("workspace_half_width", "start_offset", "start_direction"):
+    def test_fixed_initialization_arguments_replace_random_sampling_and_have_no_workspace(self):
+        self.assertEqual(self.args.start_clearance, .075)
+        for removed in ("workspace_half_width", "start_offset", "start_direction",
+                        "start_min_distance", "start_distance", "seed"):
             self.assertFalse(hasattr(self.args, removed))
-        custom = pushing.parser().parse_args(["--start-min-distance", ".02", "--start-distance", ".08", "--seed", "5"])
-        self.assertEqual(custom.start_min_distance, .02)
-        self.assertEqual(custom.start_distance, .08)
-        self.assertEqual(custom.seed, 5)
+        custom = pushing.parser().parse_args(["--start-clearance", ".08"])
+        self.assertEqual(custom.start_clearance, .08)
+        self.assertEqual(pushing.make_setup(custom, self.result, self.shape, self.goal)
+                         ["start_initialization"]["clearance_m"], .08)
         setup = pushing.make_setup(self.args, self.result, self.shape, self.goal)
         self.assertNotIn("workspace_xy_bounds_m", setup)
         self.assertNotIn("workspace", setup["spacemouse_control"]["rule"])
         for value in ("0", "-1", "nan", "inf"):
             with self.subTest(distance=value), self.assertRaises(SystemExit):
-                pushing.main(["--start-distance", value])
-        for minimum in ("-1", "nan", "inf", ".2", ".3"):
-            with self.subTest(minimum=minimum), self.assertRaises(SystemExit):
-                pushing.main(["--start-min-distance", minimum])
+                pushing.main(["--start-clearance", value])
+        for removed in ("--start-min-distance", "--start-distance", "--seed"):
+            with self.subTest(argument=removed), self.assertRaises(SystemExit):
+                pushing.parser().parse_args([removed, "5"])
 
     def test_scale_default_override_metadata_and_validation(self):
         self.assertEqual(self.args.scale, .05)
@@ -313,8 +402,7 @@ class TPushingWorkflowTest(unittest.TestCase):
 
     def episode_fakes(self, lost_after=None):
         clock, kin = FakeClock(), FakeKinematics()
-        setup = pushing.make_setup(self.args, self.result, self.shape, self.goal)
-        setup = pushing.make_episode_setup(self.args, setup, self.shape, self.goal, np.random.default_rng(1))
+        setup = pushing.make_episode_setup(self.args, self.ab_setup(), self.shape, self.goal)
         robot = FakeRobot(kin.ee_for_tip(setup["start_tip_base_m"]))
         motion = FakeMotion(robot, clock)
         tracker = FakeTracker(clock, self.goal, lost_after=lost_after)
@@ -425,8 +513,10 @@ class TPushingWorkflowTest(unittest.TestCase):
             return writer
 
         initial = self.goal.copy()
+        goal_b = self.goal.copy()
+        goal_b[1, 3] += .35
         frame = {"image": np.zeros((8, 8, 3), dtype=np.uint8), "record": {"T_base_object": self.goal.tolist()}}
-        poses = [(self.goal, frame), (initial, frame)]
+        poses = [(self.goal, frame), (goal_b, frame), (initial, frame)]
 
         def failed_episode(*_):
             events.append("episode failed")
@@ -448,7 +538,7 @@ class TPushingWorkflowTest(unittest.TestCase):
         self.assertLess(events.index("approach"), events.index("attach"))
         self.assertLess(events.index("attach"), events.index("osc"))
         self.assertLess(events.index("osc"), events.index("episode failed"))
-        self.assertEqual(capture.call_count, 2)  # Goal, then initial episode pose only.
+        self.assertEqual(capture.call_count, 3)  # Goals A/B, then the actual initial pose.
         self.assertEqual(motion_factory.call_args.kwargs, {"home_q": self.args.home_q})
         self.assertLess(events.index("stop"), events.index("drain recording"))
         self.assertLess(events.index("stop"), events.index("mouse closed"))
@@ -461,22 +551,24 @@ class TPushingWorkflowTest(unittest.TestCase):
         self.assertEqual(manifest["status"], "error")
         self.assertIn("synthetic loop failure", manifest["reason"])
 
-    def test_sampled_starts_are_shared_by_motion_and_recording_and_survive_approach_failure(self):
+    def test_fixed_starts_are_shared_by_motion_and_recording_and_survive_approach_failure(self):
         for fail_approach in (False, True):
             with self.subTest(fail_approach=fail_approach):
                 self.args.output = self.directory / str(fail_approach)
-                self.args.episodes, self.args.seed = 2, 17
+                self.args.episodes = 2
                 calibration_file = self.directory / "calibration.json"
                 calibration_file.write_text(json.dumps(self.result))
-                first, second = self.goal.copy(), self.goal.copy()
+                goal_b = self.goal.copy()
+                goal_b[:3, 3] += [0., .35, .004]  # A fixes table height despite B's measurement noise.
+                first, second = self.goal.copy(), goal_b.copy()
                 first[:2, 3] += [-.04, .03]
                 second[:2, 3] += [.05, -.04]
                 second[:3, :3] = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]]) @ second[:3, :3]
                 frames = [{"image": np.zeros((8, 8, 3), dtype=np.uint8),
                            "record": {"T_base_object": pose.tolist(), "sequence": i,
                                       "camera_timestamp_s": 1000. + i}}
-                          for i, pose in enumerate((self.goal, first, second))]
-                captures = [(pose, frame) for pose, frame in zip((self.goal, first, second), frames)]
+                          for i, pose in enumerate((self.goal, goal_b, first, second))]
+                captures = [(pose, frame) for pose, frame in zip((self.goal, goal_b, first, second), frames)]
                 robot = mock.Mock()
                 tracker = SimpleNamespace(metadata=self.result["camera"], attach=mock.Mock())
                 camera_context, mouse_context = mock.MagicMock(), mock.MagicMock()
@@ -500,28 +592,49 @@ class TPushingWorkflowTest(unittest.TestCase):
                         mock.patch.object(pushing.tracking, "MouseReader", return_value=mouse_context), \
                         mock.patch.object(pushing.tracking, "capture_target", side_effect=captures), \
                         mock.patch.object(pushing.motion_code, "Motion", return_value=motion), \
-                        mock.patch.object(pushing, "ask_ready", return_value=True), \
+                        mock.patch.object(pushing, "ask_ready", return_value=True) as ready, \
                         mock.patch.object(pushing, "collect_episode", side_effect=collect_episode), \
-                        mock.patch.object(self.shape, "sample_start_xy", wraps=self.shape.sample_start_xy) as sample:
+                        mock.patch.object(np.random, "default_rng", side_effect=AssertionError("Random initialization is removed")), \
+                        mock.patch.object(self.shape, "fixed_start_xy", wraps=self.shape.fixed_start_xy) as fixed_start:
                     if fail_approach:
                         with self.assertRaisesRegex(RuntimeError, "synthetic approach failure"):
                             pushing.collect(self.args, calibration_file, self.result, self.shape, FakeKinematics())
                     else:
                         self.assertEqual(pushing.collect(self.args, calibration_file, self.result, self.shape, FakeKinematics()), 0)
-                    self.assertEqual(sample.call_count, 1 if fail_approach else 2)
+                    self.assertEqual(fixed_start.call_count, 1 if fail_approach else 2)
+                    self.assertEqual(ready.call_count, 3)  # Capture A, capture B, return object to A once.
                 run_setup = json.loads((self.args.output / "setup.json").read_text())
                 self.assertNotIn("start_tip_base_m", run_setup)
+                np.testing.assert_array_equal(run_setup["T_base_goals"]["A"], self.goal)
+                np.testing.assert_array_equal(run_setup["T_base_goals"]["B"], goal_b)
+                np.testing.assert_array_equal(run_setup["T_base_goal"], goal_b)
+                self.assertAlmostEqual(run_setup["table_height_m"], .1)
+                for label, goal in (("A", self.goal), ("B", goal_b)):
+                    self.assertTrue((self.args.output / f"goal_{label}.png").is_file())
+                    detection = json.loads((self.args.output / f"goal_{label}_detection.json").read_text())
+                    np.testing.assert_array_equal(detection["T_base_object"], goal)
                 self.assertEqual(motion.go_home.call_count, 1 if fail_approach else 3)
                 self.assertEqual(len(episodes), 0 if fail_approach else 2)
                 for index, initial in enumerate((first,) if fail_approach else (first, second), 1):
                     folder = self.args.output / f"episode_{index:04d}"
                     saved = json.loads((folder / "setup.json").read_text())
                     np.testing.assert_array_equal(saved["initial_T_base_object"], initial)
-                    np.testing.assert_array_equal(saved["T_base_goal"], self.goal)
-                    self.assertEqual(saved["initial_detection"]["sequence"], index)
+                    np.testing.assert_array_equal(saved["T_base_goal"], goal_b if index == 1 else self.goal)
+                    self.assertEqual(saved["source_goal"], "A" if index == 1 else "B")
+                    self.assertEqual(saved["target_goal"], "B" if index == 1 else "A")
+                    self.assertEqual(saved["direction"], "A_to_B" if index == 1 else "B_to_A")
+                    self.assertEqual(saved["initial_detection"]["sequence"], index + 1)
                     self.assertAlmostEqual(saved["table_height_m"], .1)
                     self.assertAlmostEqual(saved["start_tip_base_m"][2], .12)
-                    self.assertTrue(.05 < self.shape.distance_xy(initial, saved["start_tip_base_m"][:2]) <= .1)
+                    source = self.goal if index == 1 else goal_b
+                    np.testing.assert_array_equal(motion.approach.call_args_list[index - 1].args[0],
+                                                  saved["start_tip_base_m"])
+                    np.testing.assert_array_equal(saved["approach_plan"]["tip"], saved["start_tip_base_m"])
+                    self.assertAlmostEqual(self.shape.distance_xy(source, saved["start_tip_base_m"][:2]),
+                                           .075, places=6)
+                    self.assertAlmostEqual(saved["start_outline_distance_m"], .075, places=6)
+                    self.assertNotAlmostEqual(self.shape.distance_xy(initial, saved["start_tip_base_m"][:2]),
+                                              .075, places=4)
                     outcome = json.loads((folder / "episode.json").read_text())
                     self.assertEqual(outcome["status"], "error" if fail_approach else "success")
 

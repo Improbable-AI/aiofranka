@@ -89,6 +89,69 @@ class TGeometryTest(unittest.TestCase):
         self.assertAlmostEqual(self.shape.distance_xy(pose, [.16, -.096]), .064, places=6)
         self.assertEqual(self.shape.distance_xy(pose, [0, 0]), 0)
 
+    def test_fixed_start_repeats_exactly_and_stays_away_from_destination(self):
+        source, destination = flat_pose(), flat_pose(yaw=43)
+        source[:2, 3] = [.55, -.22]
+        destination[:2, 3] = [.9, .08]
+        before_source, before_destination = source.copy(), destination.copy()
+        point = self.shape.fixed_start_xy(source, destination)
+        for _ in range(5):
+            np.testing.assert_array_equal(self.shape.fixed_start_xy(source, destination), point)
+        outward = source[:2, 3] - destination[:2, 3]
+        outward /= np.linalg.norm(outward)
+        projected_outline = self.shape.footprint(source).reshape(-1, 2) @ outward
+        self.assertAlmostEqual(float(point @ outward - projected_outline.max()), .075)
+        self.assertAlmostEqual(self.shape.distance_xy(source, point), .075, places=7)
+        np.testing.assert_array_equal(source, before_source)
+        np.testing.assert_array_equal(destination, before_destination)
+
+    def test_fixed_start_rotates_and_translates_with_saved_goal_pair(self):
+        source, destination = flat_pose(), flat_pose(yaw=-12)
+        destination[:2, 3] = [.31, -.22]  # Oblique direction gives one support vertex.
+        original = self.shape.fixed_start_xy(source, destination, clearance=.061)
+        global_pose = np.eye(4)
+        global_pose[:3, :3] = Rotation.from_euler("z", 37, degrees=True).as_matrix()
+        global_pose[:3, 3] = [.65, -.3, .12]
+        moved_source, moved_destination = global_pose @ source, global_pose @ destination
+        actual = self.shape.fixed_start_xy(moved_source, moved_destination, clearance=.061)
+        expected = global_pose[:2, :2] @ original + global_pose[:2, 3]
+        np.testing.assert_allclose(actual, expected, atol=1e-12)
+        self.assertAlmostEqual(self.shape.distance_xy(moved_source, actual), .061, places=7)
+
+    def test_fixed_start_has_exact_clearance_from_the_concave_outline_in_all_directions(self):
+        for yaw in (0, 37, 143):
+            source = flat_pose(yaw=yaw)
+            source[:2, 3] = [.65, -.3]
+            rotation_xy = Rotation.from_euler("z", yaw, degrees=True).as_matrix()[:2, :2]
+            for angle in np.linspace(0., 2. * np.pi, 13)[:-1]:
+                destination = source.copy()
+                destination[:2, 3] += .4 * np.array([np.cos(angle), np.sin(angle)])
+                point = self.shape.fixed_start_xy(source, destination)
+                reference_xy = (point - source[:2, 3]) @ rotation_xy
+                # Independent distance to the union of the axis-aligned stem and bar.
+                stem = np.linalg.norm(np.maximum(np.abs(reference_xy) - [.032, .128], 0))
+                bar = np.linalg.norm(np.maximum(np.abs(reference_xy - [0., -.096]) - [.096, .032], 0))
+                self.assertAlmostEqual(min(stem, bar), .075, places=12)
+
+    def test_fixed_start_same_xy_uses_negative_base_y_even_if_goals_differ_in_orientation_or_z(self):
+        source, destination = flat_pose(), flat_pose(yaw=93)
+        destination[2, 3] += .25
+        point = self.shape.fixed_start_xy(source, destination)
+        self.assertAlmostEqual(point[1], -.128 - .075)
+        self.assertAlmostEqual(self.shape.distance_xy(source, point), .075, places=7)
+        destination[0, 3] += 5e-10
+        np.testing.assert_array_equal(self.shape.fixed_start_xy(source, destination), point)
+
+    def test_fixed_start_rejects_invalid_clearance_and_either_invalid_transform(self):
+        for clearance in (0., -.01, np.nan, np.inf):
+            with self.assertRaisesRegex(ValueError, "positive and finite"):
+                self.shape.fixed_start_xy(flat_pose(), flat_pose(), clearance)
+        invalid = flat_pose()
+        invalid[0, 0] = 2.
+        for source, destination in ((invalid, flat_pose()), (flat_pose(), invalid)):
+            with self.assertRaisesRegex(ValueError, "rigid"):
+                self.shape.fixed_start_xy(source, destination)
+
     def test_sampled_starts_are_five_to_ten_cm_from_the_actual_outline(self):
         rng = np.random.default_rng(42)
         xy = np.array([self.shape.sample_start_xy(flat_pose(), rng) for _ in range(500)])

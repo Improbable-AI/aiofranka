@@ -96,6 +96,24 @@ class TShape:
                   for polygon in polygons]
         return float(max(0, -max(signed)))
 
+    def fixed_start_xy(self, source_pose, destination_pose, clearance=.075):
+        """Fixed point outside the saved source, on its side away from the destination.
+
+        Offset a support vertex by the requested clearance. Every source point
+        lies behind its supporting line, so the nearest outline distance is
+        exactly the clearance, including for the concave T shape.
+        """
+        if not np.isfinite(clearance) or clearance <= 0:
+            raise ValueError("Start clearance must be positive and finite")
+        source = rigid_transform(source_pose)
+        destination = rigid_transform(destination_pose)
+        direction = source[:2, 3] - destination[:2, 3]
+        distance = np.linalg.norm(direction)
+        direction = direction / distance if distance >= 1e-9 else np.array([0., -1.])
+        vertices = self.footprint(source).reshape(-1, 2)
+        boundary = vertices[np.argmax(vertices @ direction)]
+        return boundary + clearance * direction
+
     def sample_start_xy(self, pose, rng, max_distance=.10, min_distance=.05):
         """Sample uniformly by area at min_distance < distance <= max_distance.
 

@@ -5,10 +5,12 @@
     python examples/14_collect_t_pushing.py collect --condition elevated
     python examples/14_collect_t_pushing.py collect --resume data/t_pushing/RUN
 
-Place the T-block at the goal and press Enter to fix the goal and table height.
-Each episode moves home, waits for you to relocate the block, then samples a
-start uniformly 5–10 cm outside its outline. All
-automatic moves use joint space. --seed makes the random draws reproducible.
+Place the T-block at A and then B when prompted to record both goal poses.
+Return it to A for the first demonstration, then push A->B, B->A, and repeat.
+After each episode the robot moves home and automatically returns to a fixed
+start 7.5 cm outside the recorded source outline, on the side away from the
+recorded destination. Live object motion does not shift this start point.
+All automatic moves use joint space.
 SpaceMouse X/Y adds --scale (default 0.05 m) times the latest input to measured
 base X/Y. The tip stays commanded 2 cm above the table with the stick pointing
 down; Z and rotation input are ignored. The direct-mount tip offset is 0.161 m.
@@ -21,8 +23,9 @@ completion. Start PyCAAS and enable robot control separately before collecting.
 RGB and AprilCube overlay MP4s are encoded after the robot stops (--no-video to skip).
 
 `inspect` (the default) and `plan --goal-pose setup.json` open no devices.
-`--resume RUN` reuses its saved settings, calibration, goal, and table height,
-and appends new episode directories after every existing episode.
+`--resume RUN` reuses saved settings, calibration, goals A/B, and table height.
+It identifies the current object location and targets the opposite goal,
+appending new episode directories after every existing episode.
 """
 
 from __future__ import annotations
@@ -110,19 +113,38 @@ def make_setup(args, result, shape, goal):
             "spacemouse_control": spacemouse_control(args),
             "success_metric": "intersection_area / goal_T_footprint_area",
             "success_threshold": args.success_threshold,
-            "start_sampling": {"method": "uniform_area_outside_T_outline",
-                               "min_distance_m": args.start_min_distance,
-                               "max_distance_m": args.start_distance, "seed": args.seed}}
+            "start_initialization": {"method": "fixed_source_outline",
+                                     "clearance_m": args.start_clearance,
+                                     "side": "away_from_destination",
+                                     "same_xy_fallback": "base_negative_y"}}
 
 
-def make_episode_setup(args, setup, shape, initial_object, rng):
-    """Sample once around the relocated T; preserve the run's goal and height."""
-    xy = shape.sample_start_xy(initial_object, rng, max_distance=args.start_distance,
-                               min_distance=args.start_min_distance)
+def make_episode_setup(args, setup, shape, initial_object):
+    """Use saved source geometry for the start; retain the actual observation."""
+    source = setup["T_base_goals"][setup["source_goal"]]
+    xy = shape.fixed_start_xy(source, setup["T_base_goal"], args.start_clearance)
     start = np.r_[xy, setup["table_height_m"] + args.tip_height]
     return {**setup, "initial_T_base_object": np.asarray(initial_object).tolist(),
             "start_tip_base_m": start.tolist(),
-            "start_outline_distance_m": shape.distance_xy(initial_object, xy)}
+            "start_outline_distance_m": shape.distance_xy(source, xy)}
+
+
+def select_source_goal(shape, goals, current):
+    """Match the live T footprint; break equal coverage by XY distance."""
+    def score(label):
+        pose = np.asarray(goals[label])
+        distance = np.linalg.norm(pose[:2, 3] - np.asarray(current)[:2, 3])
+        return shape.overlap(pose, current), -distance
+
+    return max(("A", "B"), key=score)
+
+
+def setup_for_goal(setup, target):
+    """Select an episode destination without changing the run's fixed height."""
+    source = "B" if target == "A" else "A"
+    return {**setup, "T_base_goal": setup["T_base_goals"][target],
+            "source_goal": source, "target_goal": target,
+            "direction": f"{source}_to_{target}"}
 
 
 def spacemouse_control(args):
@@ -220,8 +242,10 @@ def collect(args, calibration_path, result, shape, kin):
     setup = None
     if args.resume:
         saved = json.loads((run / "setup.json").read_text())
-        setup = {**saved, **make_setup(args, result, shape, saved["T_base_goal"]),
+        setup = {**saved, **make_setup(args, result, shape, saved["T_base_goals"]["A"]),
+                 "T_base_goal": saved["T_base_goals"]["B"],
                  "table_height_m": saved["table_height_m"], "osc_gains": saved["osc_gains"]}
+        setup.pop("start_sampling", None)  # Earlier A/B runs used random starts.
         manifest_path = run / f"resume_{next_index(run, 'resume_'):04d}.json"
     else:
         run.mkdir(parents=True, exist_ok=False)
@@ -229,8 +253,6 @@ def collect(args, calibration_path, result, shape, kin):
         shutil.copyfile(args.target_config, run / "target_config.json")
         manifest_path = run / "run.json"
     first_episode = next_index(run, "episode_")
-    # Resuming a seeded run starts a distinct, reproducible random stream.
-    random_seed = [args.seed, first_episode] if args.resume and args.seed is not None else args.seed
     manifest = {"schema_version": 1, "created_at": datetime.now(timezone.utc).isoformat(),
                 "condition": args.condition, "calibration_source": str(calibration_path),
                 "calibration_sha256": digest(calibration_path), "target_config_sha256": digest(args.target_config),
@@ -238,7 +260,6 @@ def collect(args, calibration_path, result, shape, kin):
                 "stick_geometry": geometry.load_stick_tip(args.stick_xml),
                 "tool_mount": "Direct to attachment_site; tip offset confirmed by operator",
                 "arguments": vars(args), "status": "setting_up", "first_episode": first_episode,
-                "random_seed": random_seed,
                 "aiofranka_source": getattr(aiofranka, "__file__", None),
                 "numerical_threads": {name: os.environ.get(name) for name in
                                       ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS")},
@@ -249,11 +270,11 @@ def collect(args, calibration_path, result, shape, kin):
         json.dump(recording.json_value(manifest), stream, indent=2, allow_nan=False)
     print(f"Run: {run}\nUsing calibration: {calibration_path}")
     if args.resume:
-        print(f"Resuming at episode {first_episode:04d}; reusing the saved goal and table height.")
+        print(f"Resuming at episode {first_episode:04d}; reusing goals A/B and the saved table height.")
+        print("The current T-block pose will select the first direction.")
     print(f"Control package: {manifest['aiofranka_source']}")
     print("SpaceMouse: measured XY + scaled input; scale "
           f"{manifest['spacemouse_control']['xy_scale_m_per_unit']} m/unit at {args.frequency:g} Hz")
-    rng = np.random.default_rng(random_seed)
     robot = None
     try:
         def detector(metadata):
@@ -265,19 +286,24 @@ def collect(args, calibration_path, result, shape, kin):
                 lambda: camera_code.PycaasCamera(args), detector))
             mouse = stack.enter_context(tracking.MouseReader())  # Fail before robot connection if unavailable.
             if setup is None:
-                if not ask_ready("Place the T-block flat at the GOAL."):
-                    manifest["status"] = "cancelled"
-                    return 0
-                goal, goal_frame = tracking.capture_target(tracker)
-                setup = make_setup(args, result, shape, goal)
+                goals = {}
+                for label in ("A", "B"):
+                    if not ask_ready(f"Place the T-block flat at GOAL {label}."):
+                        manifest["status"] = "cancelled"
+                        return 0
+                    goal, goal_frame = tracking.capture_target(tracker)
+                    goals[label] = np.asarray(goal).tolist()
+                    if not cv2.imwrite(str(run / f"goal_{label}.png"), goal_frame["image"]):
+                        raise OSError(f"Could not save goal {label} reference image")
+                    write_json(run / f"goal_{label}_detection.json", goal_frame["record"])
+                setup = {**make_setup(args, result, shape, goals["A"]),
+                         "T_base_goals": goals, "T_base_goal": goals["B"],
+                         "goal_mode": "alternating", "table_height_reference_goal": "A"}
                 write_json(run / "setup.json", setup)
-                if not cv2.imwrite(str(run / "goal.png"), goal_frame["image"]):
-                    raise OSError("Could not save goal reference image")
-                write_json(run / "goal_detection.json", goal_frame["record"])
             manifest["setup"] = setup
-            print(f"Table Z: {setup['table_height_m']:.4f} m; episode starts "
-                  f"{args.start_min_distance:g}–{args.start_distance:g} m outside the relocated T outline")
-            print("Goal fixed. Moving to the home joint pose.")
+            print(f"Table Z: {setup['table_height_m']:.4f} m; fixed starts "
+                  f"{args.start_clearance:g} m outside the recorded source T outline")
+            print("Goals fixed. Moving to the home joint pose.")
             robot = FrankaRemoteController(args.robot_ip, home=False)
             stack.callback(robot.stop)  # Stop control before camera/HID cleanup on every exit.
             robot.start()
@@ -286,12 +312,19 @@ def collect(args, calibration_path, result, shape, kin):
             motion.go_home()
             manifest.update(status="collecting", camera=tracker.metadata)
             write_json(manifest_path, manifest)
+            if not args.resume and not ask_ready("Robot is parked. Place the T-block at A for A->B."):
+                manifest["status"] = "cancelled"
+                return 0
+            target_goal = None if args.resume else "B"
             episode = first_episode - 1
             while args.episodes == 0 or episode < first_episode - 1 + args.episodes:
-                if not ask_ready("Robot is parked. Randomize the T-block on the table."):
-                    break
                 initial_object, initial_frame = tracking.capture_target(tracker)
-                episode_setup = make_episode_setup(args, setup, shape, initial_object, rng)
+                if target_goal is None:
+                    source = select_source_goal(shape, setup["T_base_goals"], initial_object)
+                    target_goal = "B" if source == "A" else "A"
+                    print(f"Current T-block matches {source}; starting {source}->{target_goal}.")
+                episode_setup = make_episode_setup(
+                    args, setup_for_goal(setup, target_goal), shape, initial_object)
                 episode_setup["run_attempt"] = manifest_path.name
                 episode_setup["initial_detection"] = initial_frame["record"]
                 episode_setup["approach_plan"] = motion.plan_start(
@@ -305,8 +338,9 @@ def collect(args, calibration_path, result, shape, kin):
                 outcome, reason = "interrupted", "Collection interrupted"
                 try:
                     write_json(episode_path / "setup.json", episode_setup)
-                    print(f"Episode {episode} start tip: {episode_setup['start_tip_base_m']} m "
-                          f"({episode_setup['start_outline_distance_m']:.3f} m outside T)")
+                    print(f"Episode {episode} {episode_setup['source_goal']}->{target_goal} "
+                          f"start tip: {episode_setup['start_tip_base_m']} m "
+                          f"({episode_setup['start_outline_distance_m']:.3f} m outside recorded source T)")
                     motion.approach(episode_setup["start_tip_base_m"])
                     tracker.attach(writer)
                     motion.configure_osc()
@@ -322,6 +356,8 @@ def collect(args, calibration_path, result, shape, kin):
                 finally:
                     tracker.attach(None)
                     writer.finish(outcome, reason)
+                if outcome == "success":
+                    target_goal = "B" if target_goal == "A" else "A"
                 print(f"Episode {episode}: {outcome}. Resetting through the default joint pose.")
                 motion.go_home()
             manifest["status"] = "complete"
@@ -360,11 +396,8 @@ def parser():
     p.add_argument("--tip-offset", type=float, nargs=3, default=[0., 0., .161], metavar=("X", "Y", "Z"))
     p.set_defaults(tip_height=.020)  # This experiment fixes physical tip clearance at 2 cm.
     p.add_argument("--home-q", type=float, nargs=7, default=motion_code.HOME_Q.tolist())
-    p.add_argument("--start-min-distance", type=float, default=.05,
-                   help="Minimum distance outside the relocated T outline for sampled starts, meters")
-    p.add_argument("--start-distance", type=float, default=.10,
-                   help="Maximum distance outside the relocated T outline for sampled starts, meters")
-    p.add_argument("--seed", type=int, help="Random seed for repeatable episode start samples")
+    p.add_argument("--start-clearance", type=float, default=.075,
+                   help="Fixed tip distance outside the recorded source T outline, meters (default: 0.075)")
     p.add_argument("--scale", type=float, default=.05,
                    help="XY offset from measured position, meters per input unit (default: 0.05)")
     p.add_argument("--deadzone", type=float, default=0.,
@@ -372,7 +405,7 @@ def parser():
     p.add_argument("--frequency", type=float, default=50.)
     p.add_argument("--success-threshold", type=float, default=.85)
     p.add_argument("--episode-seconds", type=float, default=300.)
-    p.add_argument("--episodes", type=int, default=0, help="Number of new episodes this invocation; 0: until q")
+    p.add_argument("--episodes", type=int, default=0, help="Number of new episodes this invocation; 0: until Ctrl+C")
     destination = p.add_mutually_exclusive_group()
     destination.add_argument("--output", type=Path, help="New run directory (must not exist)")
     destination.add_argument("--resume", type=Path, help="Append episodes using an existing run's saved setup/settings")
@@ -380,9 +413,9 @@ def parser():
                    help="JPEG quality 95 (default), or lossless PNG with higher disk use")
     p.add_argument("--video", action=argparse.BooleanOptionalAction, default=True,
                    help="Encode RGB and AprilCube overlay MP4s after robot shutdown (default: enabled)")
-    p.add_argument("--goal-pose", type=Path, help="For offline plan: setup.json or a JSON 4x4 T_base_goal")
+    p.add_argument("--goal-pose", type=Path, help="For offline plan: saved run or episode setup.json with goals A/B")
     p.add_argument("--object-pose", type=Path,
-                   help="For plan: JSON T_base_object/initial_T_base_object or 4x4 pose; default uses goal as example")
+                   help="For plan: current object pose to simulate resume direction selection; JSON or 4x4 pose")
     p.add_argument("--stream", help="PyCAAS stream; default selects the calibrated camera serial")
     p.add_argument("--pycaas-endpoint", default="ipc:///tmp/pycaas.sock")
     return p
@@ -391,11 +424,24 @@ def parser():
 def parse_arguments(p, argv=None):
     args = p.parse_args(argv)
     if args.resume is None:
+        if args.command == "plan" and args.goal_pose is not None:
+            saved = json.loads(args.goal_pose.read_text())
+            if not isinstance(saved, dict):
+                raise ValueError("plan requires a saved setup with goals A/B")
+            saved = saved.get("metadata", saved)
+            p.set_defaults(start_clearance=saved.get("start_initialization", {}).get(
+                               "clearance_m", args.start_clearance),
+                           home_q=saved.get("home_q", args.home_q),
+                           tip_offset=saved.get("tip_offset_ee_m", args.tip_offset))
+            args = p.parse_args(argv)
         return args
     run = args.resume.expanduser().resolve()
     original = json.loads((run / "run.json").read_text())
     setup = json.loads((run / "setup.json").read_text())
-    geometry.rigid_transform(setup["T_base_goal"])
+    if "T_base_goals" not in setup:
+        raise ValueError("This is a single-goal run. Start a new A/B run; --resume requires saved goals A and B.")
+    for label in ("A", "B"):
+        geometry.rigid_transform(setup["T_base_goals"][label])
     if not np.isfinite(setup["table_height_m"]):
         raise ValueError("Saved table height is not finite")
     excluded = {"command", "output", "resume", "episodes", "calibration", "target_config", "goal_pose", "object_pose"}
@@ -420,19 +466,17 @@ def main(argv=None):
         args = parse_arguments(p, argv)
     except (OSError, ValueError, KeyError) as exc:
         p.error(str(exc))
-    positive = (args.tip_height, args.start_distance, args.frequency,
+    positive = (args.tip_height, args.start_clearance, args.frequency,
                 args.scale,
                 args.episode_seconds)
     if (not np.isfinite(positive).all() or min(positive) <= 0 or not 0 < args.success_threshold < 1
-            or not 0 <= args.start_min_distance < args.start_distance
             or not 0 <= args.deadzone < 1 or args.episodes < 0 or not 10 <= args.frequency <= 100
-            or not np.isfinite(args.tip_offset + args.home_q).all()
-            or (args.seed is not None and args.seed < 0)):
+            or not np.isfinite(args.tip_offset + args.home_q).all()):
         p.error("Invalid dimensions, rates, thresholds, or joint/tool values")
     if args.command == "collect" and args.condition is None:
         p.error("collect requires --condition ground or elevated")
     if args.command == "plan" and args.goal_pose is None:
-        p.error("plan requires --goal-pose (a saved setup.json or a 4x4 transform)")
+        p.error("plan requires --goal-pose (a saved run or episode setup.json with goals A/B)")
     cv2.setNumThreads(1)
     try:
         control = spacemouse_control(args)
@@ -446,24 +490,31 @@ def main(argv=None):
         print(f"T-block footprint: {shape.area_m2:.6f} m²; physical tip offset: {args.tip_offset} m")
         print(f"Default joint-pose tip: {kin.tip(kin.fk(args.home_q)).tolist()} m")
         print(f"SpaceMouse XY scale: {control['xy_scale_m_per_unit']} m/unit from measured position")
+        print(f"Fixed tip start: {args.start_clearance:g} m outside the recorded source outline, away from destination")
         if args.resume:
             print(f"Resume: {args.resume}; next episode {next_index(args.resume, 'episode_'):04d}")
+            print("Goals A/B are saved; collect will choose direction from the current tracked object pose.")
         if args.command == "plan":
             saved = json.loads(args.goal_pose.read_text())
-            goal = saved["T_base_goal"] if isinstance(saved, dict) else saved
-            setup = make_setup(args, result, shape, goal)
-            initial_object = goal
-            if args.object_pose is None:
-                print("Sampling around the goal pose as an example object; collection uses each relocated T pose.")
-            else:
+            saved = saved.get("metadata", saved)
+            goals = saved["T_base_goals"]
+            setup = {**saved, **make_setup(args, result, shape, goals["A"]),
+                     "table_height_m": saved["table_height_m"]}
+            setup.pop("start_sampling", None)
+            target = saved.get("target_goal", "B")
+            source = "B" if target == "A" else "A"
+            initial_object = saved.get("initial_T_base_object", goals[source])
+            if args.object_pose is not None:
                 initial_object = json.loads(args.object_pose.read_text())
                 if isinstance(initial_object, dict):
                     initial_object = initial_object.get("metadata", initial_object)
                     initial_object = initial_object.get("T_base_object", initial_object.get("initial_T_base_object"))
                 if initial_object is None:
                     raise ValueError("--object-pose needs T_base_object, initial_T_base_object, or a 4x4 pose")
-                print(f"Sampling around object pose: {args.object_pose}")
-            episode_setup = make_episode_setup(args, setup, shape, initial_object, np.random.default_rng(args.seed))
+                source = select_source_goal(shape, goals, initial_object)
+                target = "B" if source == "A" else "A"
+            print(f"Planning {source}->{target}; tip start uses recorded {source} geometry.")
+            episode_setup = make_episode_setup(args, setup_for_goal(setup, target), shape, initial_object)
             plan = motion_code.Motion(None, kin, home_q=args.home_q).plan_start(
                 episode_setup["start_tip_base_m"])
             episode_setup["approach_plan"] = recording.json_value(plan)
