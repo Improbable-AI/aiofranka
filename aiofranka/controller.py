@@ -11,7 +11,7 @@ from tqdm import trange
 from pathlib import Path
 import numpy as np 
 import time 
-from aiofranka.robot import RobotInterface
+from aiofranka.robot import RobotInterface, set_macos_control_thread_qos
 from ruckig import InputParameter, Ruckig, Trajectory, Result
 
 logger = logging.getLogger(__name__)
@@ -300,6 +300,9 @@ class FrankaController:
 
     async def _run(self): 
         """Run the control loop continuously in the background"""
+        # On macOS, libfranka busy-waits for robot states, which needs this thread on a
+        # performance core. It is not always the thread that created the Robot.
+        set_macos_control_thread_qos()
         self.running = True
         
         loop_times = []
