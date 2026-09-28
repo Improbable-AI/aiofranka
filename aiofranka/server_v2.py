@@ -15,6 +15,7 @@ import logging
 import multiprocessing
 import os
 import signal
+import sys
 import threading
 import time
 
@@ -22,7 +23,7 @@ import mujoco
 import numpy as np
 
 from aiofranka.ipc import StateBlock, STATUS_RUNNING, STATUS_ERROR, pid_file_for_ip
-from aiofranka.robot import RobotInterface
+from aiofranka.robot import RobotInterface, set_macos_control_thread_qos
 from aiofranka.server import (
     ServerController, run_server,
     _resolve_from_config,
@@ -80,21 +81,27 @@ class ServerControllerV2(ServerController):
 
     def _run_rt(self):
         """The RT control loop — runs in a dedicated thread with per-phase profiling."""
-        # Pin to last CPU core and set SCHED_FIFO for minimal jitter
-        n_cpus = os.cpu_count() or 1
-        rt_core = n_cpus - 1
-        try:
-            os.sched_setaffinity(0, {rt_core})
-            logger.info(f"RT thread pinned to CPU {rt_core}")
-        except Exception as e:
-            logger.warning(f"Could not pin RT thread to CPU {rt_core}: {e}")
-        try:
-            os.sched_setscheduler(0, os.SCHED_FIFO, os.sched_param(80))
-            logger.info("RT thread set to SCHED_FIFO priority 80")
-        except PermissionError:
-            logger.warning("Could not set SCHED_FIFO (no permission) — run with CAP_SYS_NICE for best RT performance")
-        except Exception as e:
-            logger.warning(f"Could not set SCHED_FIFO: {e}")
+        if sys.platform == "darwin":
+            # macOS has no CPU pinning or SCHED_FIFO. libfranka busy-waits for robot
+            # states instead, which needs this thread on a performance core.
+            if set_macos_control_thread_qos():
+                logger.info("RT thread set to QoS USER_INTERACTIVE")
+        else:
+            # Pin to last CPU core and set SCHED_FIFO for minimal jitter
+            n_cpus = os.cpu_count() or 1
+            rt_core = n_cpus - 1
+            try:
+                os.sched_setaffinity(0, {rt_core})
+                logger.info(f"RT thread pinned to CPU {rt_core}")
+            except Exception as e:
+                logger.warning(f"Could not pin RT thread to CPU {rt_core}: {e}")
+            try:
+                os.sched_setscheduler(0, os.SCHED_FIFO, os.sched_param(80))
+                logger.info("RT thread set to SCHED_FIFO priority 80")
+            except PermissionError:
+                logger.warning("Could not set SCHED_FIFO (no permission) — run with CAP_SYS_NICE for best RT performance")
+            except Exception as e:
+                logger.warning(f"Could not set SCHED_FIFO: {e}")
 
         last_t = time.perf_counter()
         jitter_log_t = last_t
