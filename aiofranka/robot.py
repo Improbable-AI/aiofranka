@@ -33,6 +33,39 @@ def set_macos_control_thread_qos():
     return libc.pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0) == 0
 
 
+_MACOS_PYLIBFRANKA_MISSING = """pylibfranka is not installed.
+
+PyPI has no macOS build of pylibfranka. Install it from source from
+younghyopark/libfranka, a fork with macOS support:
+
+    pip install "pylibfranka @ git+https://github.com/younghyopark/libfranka@macos-support#subdirectory=pylibfranka"
+
+This needs the Xcode Command Line Tools and some Homebrew packages, see
+https://github.com/Improbable-AI/aiofranka#macos-apple-silicon"""
+
+
+def require_pylibfranka():
+    """
+    Import pylibfranka, explaining how to install it on macOS if it is missing.
+
+    aiofranka does not depend on pylibfranka on macOS, because PyPI has no macOS
+    build of it.
+
+    Returns:
+        module: The pylibfranka module.
+
+    Raises:
+        ModuleNotFoundError: If pylibfranka is not installed.
+    """
+    try:
+        import pylibfranka
+    except ModuleNotFoundError as e:
+        if sys.platform == "darwin" and e.name == "pylibfranka":
+            raise ModuleNotFoundError(_MACOS_PYLIBFRANKA_MISSING, name=e.name) from e
+        raise
+    return pylibfranka
+
+
 class RobotInterface: 
     """
     High-level interface for Franka FR3 robot control.
@@ -80,7 +113,7 @@ class RobotInterface:
                            or None for simulation mode.
                            
         Raises:
-            RuntimeError: If pylibfranka is not installed (real robot mode)
+            ModuleNotFoundError: If pylibfranka is not installed (real robot mode)
             ConnectionError: If cannot connect to robot at given IP
             
         Note:
@@ -109,7 +142,7 @@ class RobotInterface:
         mujoco.mj_fullM(self.model, self.data, np.zeros((self.model.nv, self.model.nv)))
 
         if self.real: 
-            import pylibfranka
+            pylibfranka = require_pylibfranka()
             self.robot = pylibfranka.Robot(ip, pylibfranka.RealtimeConfig.kIgnore)
 
             self.robot.set_collision_behavior(

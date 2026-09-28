@@ -114,7 +114,11 @@ class FrankaRemoteController:
         Raises:
             RuntimeError: If the server fails to start.
         """
+        from aiofranka.robot import require_pylibfranka
         from aiofranka.server import start_subprocess
+
+        # Fail with installation instructions here, not in the server subprocess
+        require_pylibfranka()
 
         _GREEN = "\033[32m"
 

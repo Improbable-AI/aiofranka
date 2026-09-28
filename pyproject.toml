@@ -21,10 +21,8 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    # PyPI has no macOS build of pylibfranka, so build it from a fork with macOS support.
-    # PyPI rejects packages with git dependencies, so this cannot be released there as is.
+    # PyPI has no macOS build of pylibfranka. On macOS, install it from source first, see the README.
     "pylibfranka; sys_platform != 'darwin'",
-    "pylibfranka @ git+https://github.com/younghyopark/libfranka@macos-support#subdirectory=pylibfranka ; sys_platform == 'darwin'",
     "ruckig",
     "numpy",
     "scipy",

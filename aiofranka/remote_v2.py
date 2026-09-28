@@ -36,7 +36,11 @@ class FrankaRemoteControllerV2(FrankaRemoteController):
 
     def start(self):
         """Start the v2 server subprocess and connect."""
+        from aiofranka.robot import require_pylibfranka
         from aiofranka.server_v2 import start_subprocess_v2
+
+        # Fail with installation instructions here, not in the server subprocess
+        require_pylibfranka()
 
         _GREEN = "\033[32m"
 
