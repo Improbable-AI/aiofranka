@@ -18,14 +18,18 @@ The library is designed for research applications requiring precise, real-time c
 
 ## Installation
 
-aiofranka requires Python 3.10 or newer.
-
 Make sure you can access Franka Desk GUI from your machine's browser by typing in the robot's IP (e.g. 172.16.0.2). Then, install:
-
 
 ```bash
 pip install aiofranka
 ```
+
+This works on:
+
+| Platform | Python |
+|----------|--------|
+| Linux x86_64, e.g. Ubuntu 22.04 or newer | 3.10 to 3.12 |
+| Apple Silicon Mac with macOS 15 or newer | 3.10 to 3.14 |
 
 Or for development:
 ```bash
@@ -36,29 +40,9 @@ pip install -e .
 
 ### macOS (Apple Silicon)
 
-On Apple Silicon Macs with macOS 15 or newer, `pip install aiofranka` also installs [pylibfranka-macos](https://pypi.org/project/pylibfranka-macos/), an unofficial macOS build of pylibfranka from [younghyopark/libfranka](https://github.com/younghyopark/libfranka/tree/macos-support), a fork with macOS support. It is not affiliated with Franka Robotics and bundles its native dependencies, so it needs no Homebrew. It installs the same `pylibfranka` module as a pylibfranka that you built from source, so uninstall that first with `pip uninstall pylibfranka`.
+On macOS, aiofranka installs [pylibfranka-macos](https://pypi.org/project/pylibfranka-macos/), an unofficial build of pylibfranka with macOS support from [younghyopark/libfranka](https://github.com/younghyopark/libfranka/tree/macos-support). It is not affiliated with Franka Robotics. To keep up with the 1 kHz control loop, it keeps one performance core busy while a control loop runs, so plug in the Mac when controlling the robot, and connect the robot via wired Ethernet.
 
-On other Macs, build pylibfranka from source before installing aiofranka. Building it needs the Xcode Command Line Tools and these Homebrew packages:
-
-```bash
-xcode-select --install
-brew install cmake pinocchio poco eigen console_bridge tinyxml2 fmt
-```
-
-Then install pylibfranka and aiofranka into a conda environment or virtualenv. Do not use the conda `base` environment: its `fmt` package conflicts with Homebrew's and breaks the build.
-
-```bash
-pip install "pylibfranka @ git+https://github.com/younghyopark/libfranka@macos-support#subdirectory=pylibfranka"
-pip install aiofranka
-```
-
-Building pylibfranka takes a few minutes. A pylibfranka built from source links against the Homebrew packages at runtime, so keep them installed. If `brew upgrade` moves one of them to a new major version, rebuild pylibfranka:
-
-```bash
-pip install --force-reinstall --no-cache-dir --no-deps "pylibfranka @ git+https://github.com/younghyopark/libfranka@macos-support#subdirectory=pylibfranka"
-```
-
-On macOS, libfranka busy-waits for robot states to keep up with the 1 kHz control loop, which keeps one performance core busy while a control loop runs. Plug in the Mac when controlling the robot, and connect the robot via wired Ethernet. See the [libfranka macOS notes](https://github.com/younghyopark/libfranka/tree/macos-support/pylibfranka#installing-prerequisites-on-macos) for details.
+Other Macs need pylibfranka built from source, see the [libfranka macOS instructions](https://github.com/younghyopark/libfranka/tree/macos-support/pylibfranka#installing-prerequisites-on-macos).
 
 ## Quick Start
 
