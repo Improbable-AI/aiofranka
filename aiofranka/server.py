@@ -35,7 +35,7 @@ from aiofranka.ipc import (
     STATUS_ERROR,
     STATUS_RUNNING,
 )
-from aiofranka.robot import RobotInterface
+from aiofranka.robot import RobotInterface, set_macos_control_thread_qos
 
 logger = logging.getLogger("aiofranka.server")
 
@@ -155,22 +155,28 @@ class ServerController(FrankaController):
 
     async def _run(self):
         """Override _run to NOT sys.exit(1) — let the server handle recovery."""
-        # Pin to last CPU core for cache locality
-        n_cpus = os.cpu_count() or 1
-        rt_core = n_cpus - 1
-        try:
-            os.sched_setaffinity(0, {rt_core})
-            logger.info(f"Control loop pinned to CPU {rt_core}")
-        except Exception as e:
-            logger.warning(f"Could not pin to CPU {rt_core}: {e}")
-        # Elevate to SCHED_FIFO real-time priority
-        try:
-            os.sched_setscheduler(0, os.SCHED_FIFO, os.sched_param(80))
-            logger.info("Control loop set to SCHED_FIFO priority 80")
-        except PermissionError:
-            logger.warning("Could not set SCHED_FIFO (no permission) — run with CAP_SYS_NICE")
-        except Exception as e:
-            logger.warning(f"Could not set SCHED_FIFO: {e}")
+        if sys.platform == "darwin":
+            # macOS has no CPU pinning or SCHED_FIFO. libfranka busy-waits for robot
+            # states instead, which needs this thread on a performance core.
+            if set_macos_control_thread_qos():
+                logger.info("Control loop set to QoS USER_INTERACTIVE")
+        else:
+            # Pin to last CPU core for cache locality
+            n_cpus = os.cpu_count() or 1
+            rt_core = n_cpus - 1
+            try:
+                os.sched_setaffinity(0, {rt_core})
+                logger.info(f"Control loop pinned to CPU {rt_core}")
+            except Exception as e:
+                logger.warning(f"Could not pin to CPU {rt_core}: {e}")
+            # Elevate to SCHED_FIFO real-time priority
+            try:
+                os.sched_setscheduler(0, os.SCHED_FIFO, os.sched_param(80))
+                logger.info("Control loop set to SCHED_FIFO priority 80")
+            except PermissionError:
+                logger.warning("Could not set SCHED_FIFO (no permission) — run with CAP_SYS_NICE")
+            except Exception as e:
+                logger.warning(f"Could not set SCHED_FIFO: {e}")
 
         self.running = True
         try:

@@ -1470,9 +1470,70 @@ def cmd_log(args):
             pass
 
 
+# libfranka's docs budget roughly 300us for the user's own control loop. The
+# rest of the 1 ms cycle goes to the network round trip and the robot's own
+# processing; a command that misses the cycle is dropped by the robot.
+RESPONSE_BUDGET_US = 300.0
+
+# A dropped command shows up in the success rate of the next one or two states,
+# so look this many iterations back for its cause.
+DROP_LOOKBACK = 3
+
+
+def _analyze_fci_timing(phase_all, success_rate_all, robot_time_all):
+    """Compute the timing metrics that matter on the robot's side of the loop.
+
+    - response: time from readOnce() returning to writeOnce() returning
+      (mj_fwd + state_build + ctrl_law), i.e. how long the robot waits for the
+      command after its state reached us.
+    - skipped states: gaps in robot_state.time larger than 1 ms. The loop never
+      saw these states and sent no command for them.
+    - dropped commands: control_command_success_rate is the fraction of the last
+      100 commands the robot received in time. Each dropped command lowers it
+      by 0.01 for 100 ticks, so the sum of (1 - rate) is the number of dropped
+      commands. Drop events are the iterations where the rate decreases.
+    """
+    import numpy as np
+
+    response = phase_all[:, 1] + phase_all[:, 2] + phase_all[:, 3]
+
+    robot_ms = np.rint(robot_time_all * 1000.0).astype(np.int64)
+    skipped = np.zeros(len(robot_ms), dtype=np.int64)
+    skipped[1:] = np.maximum(np.diff(robot_ms) - 1, 0)
+
+    sr = success_rate_all
+    new_drops = np.zeros(len(sr), dtype=np.int64)
+    new_drops[1:] = np.maximum(np.rint((sr[:-1] - sr[1:]) * 100), 0)
+    drop_events = np.flatnonzero(new_drops)
+
+    causes = {"slow response": 0, "skipped state": 0, "network/wake-up": 0}
+    for i in drop_events:
+        lo = max(0, i - DROP_LOOKBACK)
+        if np.any(response[lo:i] > RESPONSE_BUDGET_US):
+            causes["slow response"] += 1
+        elif np.any(skipped[lo:i + 1]):
+            causes["skipped state"] += 1
+        else:
+            causes["network/wake-up"] += 1
+
+    return {
+        "response": response,
+        "resp_over": int(np.sum(response > RESPONSE_BUDGET_US)),
+        "skipped": int(np.sum(skipped)),
+        "skip_gaps": int(np.count_nonzero(skipped)),
+        "max_gap_ms": int(np.max(skipped)) + 1 if np.any(skipped) else 1,
+        "dropped": int(round(np.sum(1.0 - sr))),
+        "drop_events": len(drop_events),
+        "drop_causes": causes,
+    }
+
+
 def _run_bench_loop(robot, duration, cpu_pin=None, sched_fifo=None,
                     disable_gc=False, mlock=False, prealloc=False):
-    """Run the core benchmark loop and return (dt_array, phase_array).
+    """Run the core benchmark loop.
+
+    Returns (dt_array, phase_array, phase_names, success_rate_array,
+    robot_time_array), where robot_time_array holds robot_state.time in seconds.
 
     Applies RT tuning (cpu pin, SCHED_FIFO, gc, mlock, prealloc) during the
     measured window only.
@@ -1481,6 +1542,7 @@ def _run_bench_loop(robot, duration, cpu_pin=None, sched_fifo=None,
     import mujoco
     import numpy as np
     import pylibfranka
+    from aiofranka.robot import set_macos_control_thread_qos
 
     model = robot.model
     data = robot.data
@@ -1492,6 +1554,7 @@ def _run_bench_loop(robot, duration, cpu_pin=None, sched_fifo=None,
     dt_all = np.empty(n_iters, dtype=np.float64)
     phase_all = np.empty((n_iters, len(PHASES)), dtype=np.float64)
     success_rate_all = np.empty(n_iters, dtype=np.float64)
+    robot_time_all = np.empty(n_iters, dtype=np.float64)
 
     # Pre-allocate reusable buffers (used when prealloc=True)
     _ee = np.eye(4)
@@ -1521,10 +1584,12 @@ def _run_bench_loop(robot, duration, cpu_pin=None, sched_fifo=None,
     old_affinity = None
     applied_fifo = False
     gc_was_enabled = gc.isenabled()
-    if cpu_pin is not None:
+    if sys.platform == "darwin":
+        set_macos_control_thread_qos()
+    if cpu_pin is not None and hasattr(os, "sched_setaffinity"):
         old_affinity = os.sched_getaffinity(0)
         os.sched_setaffinity(0, {cpu_pin})
-    if sched_fifo is not None:
+    if sched_fifo is not None and hasattr(os, "sched_setscheduler"):
         try:
             os.sched_setscheduler(0, os.SCHED_FIFO, os.sched_param(sched_fifo))
             applied_fifo = True
@@ -1588,6 +1653,7 @@ def _run_bench_loop(robot, duration, cpu_pin=None, sched_fifo=None,
             phase_all[i, 3] = (t4 - t3) * 1e6
             phase_all[i, 4] = (t5 - t4) * 1e6
             success_rate_all[i] = robot_state.control_command_success_rate
+            robot_time_all[i] = robot_state.time.to_sec()
             last_t = t0
     else:
         last_t = time.perf_counter()
@@ -1637,6 +1703,7 @@ def _run_bench_loop(robot, duration, cpu_pin=None, sched_fifo=None,
             phase_all[i, 3] = (t4 - t3) * 1e6
             phase_all[i, 4] = (t5 - t4) * 1e6
             success_rate_all[i] = robot_state.control_command_success_rate
+            robot_time_all[i] = robot_state.time.to_sec()
             last_t = t0
 
     # Restore
@@ -1657,7 +1724,7 @@ def _run_bench_loop(robot, duration, cpu_pin=None, sched_fifo=None,
         except Exception:
             pass
 
-    return dt_all, phase_all, PHASES, success_rate_all
+    return dt_all, phase_all, PHASES, success_rate_all, robot_time_all
 
 
 def _run_all_combos(args):
@@ -1733,13 +1800,21 @@ def _run_all_combos(args):
         (f"cpu={C}+FIFO+prealloc", C,  80,   False, False, True),
         (f"cpu={C}+FIFO+all",    C,    80,   True,  True,  True),
     ]
+    if sys.platform == "darwin":
+        # No CPU pinning, SCHED_FIFO or mlockall on macOS
+        combos = [
+            ("baseline",              None, None, False, False, False),
+            ("nogc",                  None, None, True,  False, False),
+            ("prealloc",              None, None, False, False, True),
+            ("nogc+prealloc",         None, None, True,  False, True),
+        ]
 
     results = []
     try:
         for label, cpu_pin, sched_fifo, dis_gc, ml, prealloc in combos:
             sys.stdout.write(f"  Running: {BOLD}{label}{RST} ...")
             sys.stdout.flush()
-            dt_all, phase_all, phases, sr_all = _run_bench_loop(
+            dt_all, phase_all, phases, sr_all, rt_all = _run_bench_loop(
                 robot, duration, cpu_pin=cpu_pin, sched_fifo=sched_fifo,
                 disable_gc=dis_gc, mlock=ml, prealloc=prealloc,
             )
@@ -1747,6 +1822,8 @@ def _run_all_combos(args):
             in_spec = np.sum((dt >= 900) & (dt <= 1100))
             pct_in = in_spec * 100.0 / len(dt)
             sr_min = np.min(sr_all)
+            fci = _analyze_fci_timing(phase_all, sr_all, rt_all)
+            resp_p999 = np.percentile(fci["response"], 99.9)
             results.append({
                 "label": label,
                 "pct_in": pct_in,
@@ -1756,13 +1833,18 @@ def _run_all_combos(args):
                 "p99": np.percentile(dt, 99),
                 "p999": np.percentile(dt, 99.9),
                 "sr_min": sr_min,
+                "resp_p999": resp_p999,
+                "dropped": fci["dropped"],
+                "skipped": fci["skipped"],
             })
             color = GREEN if pct_in >= 99 else YELLOW if pct_in >= 95 else RED
             sr_color = GREEN if sr_min >= 0.99 else YELLOW if sr_min >= 0.95 else RED
             sys.stdout.write(f"\r  {BOLD}{label:<25}{RST} {color}{pct_in:.2f}%{RST} in spec, "
                              f"std={np.std(dt):.1f}us, p99={np.percentile(dt, 99):.0f}us, "
                              f"max={np.max(dt):.0f}us, "
-                             f"sr_min={sr_color}{sr_min:.4f}{RST}\n")
+                             f"sr_min={sr_color}{sr_min:.4f}{RST}, "
+                             f"resp_p99.9={resp_p999:.0f}us, dropped={fci['dropped']}, "
+                             f"skipped={fci['skipped']}\n")
             sys.stdout.flush()
     finally:
         robot.stop()
@@ -1774,8 +1856,9 @@ def _run_all_combos(args):
 
     # --- Comparison table ---
     print(f"\n  {BOLD}=== Comparison ==={RST}\n")
-    print(f"    {'Config':<25} {'In-spec':>8} {'std':>8} {'p99':>8} {'p99.9':>8} {'max':>8} {'sr_min':>8}")
-    print(f"    {'─'*25} {'─'*8} {'─'*8} {'─'*8} {'─'*8} {'─'*8} {'─'*8}")
+    print(f"    {'Config':<25} {'In-spec':>8} {'std':>8} {'p99':>8} {'p99.9':>8} {'max':>8} {'sr_min':>8}"
+          f" {'resp99.9':>9} {'dropped':>8} {'skipped':>8}")
+    print(f"    {'─'*25} {'─'*8} {'─'*8} {'─'*8} {'─'*8} {'─'*8} {'─'*8} {'─'*9} {'─'*8} {'─'*8}")
     best = max(results, key=lambda r: r["pct_in"])
     for r in results:
         is_best = r is best
@@ -1784,7 +1867,8 @@ def _run_all_combos(args):
         sr_color = GREEN if r["sr_min"] >= 0.99 else YELLOW if r["sr_min"] >= 0.95 else RED
         print(f"    {r['label']:<25} {color}{r['pct_in']:>7.2f}%{RST} "
               f"{r['std']:>7.1f} {r['p99']:>7.0f} {r['p999']:>7.0f} {r['max']:>7.0f} "
-              f"{sr_color}{r['sr_min']:>7.4f}{RST}{marker}")
+              f"{sr_color}{r['sr_min']:>7.4f}{RST} {r['resp_p999']:>9.0f} "
+              f"{r['dropped']:>8} {r['skipped']:>8}{marker}")
     print(f"\n  {GREEN}Best: {best['label']}{RST}\n")
 
 
@@ -1830,6 +1914,10 @@ def cmd_rt_benchmark(args):
     if all_combos:
         _run_all_combos(args)
         return
+
+    if sys.platform == "darwin" and (cpu_pin is not None or sched_fifo is not None):
+        print(f"\n  {DIM}--cpu-pin and --sched-fifo are not available on macOS, ignoring them{RST}")
+        cpu_pin = sched_fifo = None
 
     mode_label = "v2 (RT thread)" if use_v2 else "v1 (asyncio)"
     rt_flags = []
@@ -1896,7 +1984,7 @@ def cmd_rt_benchmark(args):
     PHASES = ["readOnce", "mj_fwd", "state_build", "ctrl_law", "shm_write"]
 
     try:
-        dt_all, phase_all, PHASES, success_rate = _run_bench_loop(
+        dt_all, phase_all, PHASES, success_rate, robot_time = _run_bench_loop(
             robot, duration, cpu_pin=cpu_pin, sched_fifo=sched_fifo
         )
     finally:
@@ -1954,11 +2042,46 @@ def cmd_rt_benchmark(args):
     print(f"  {BOLD}Control command success rate{RST}")
     print(f"    mean   = {sr_color}{sr_mean:.4f}{RST}")
     print(f"    min    = {sr_color}{sr_min:.4f}{RST}")
-    n_drops = np.sum(sr < 1.0)
-    if n_drops > 0:
-        print(f"    drops  = {RED}{n_drops}{RST} iterations below 1.0")
+    n_below = np.sum(sr < 1.0)
+    if n_below > 0:
+        print(f"    below 1.0 = {RED}{n_below}{RST} iterations")
     else:
-        print(f"    drops  = {GREEN}0{RST}")
+        print(f"    below 1.0 = {GREEN}0{RST} iterations")
+    print()
+
+    # What the robot sees: response time, skipped states and dropped commands
+    fci = _analyze_fci_timing(phase_all, success_rate, robot_time)
+    resp = fci["response"]
+    n_ticks = len(resp)
+
+    resp_pct = fci["resp_over"] * 100.0 / n_ticks
+    resp_color = GREEN if fci["resp_over"] == 0 else YELLOW if resp_pct < 0.1 else RED
+    print(f"  {BOLD}Response time (readOnce -> writeOnce, budget {RESPONSE_BUDGET_US:.0f}us){RST}")
+    print(f"    mean   = {np.mean(resp):.1f} us")
+    print(f"    p99    = {np.percentile(resp, 99):.1f} us")
+    print(f"    p99.9  = {np.percentile(resp, 99.9):.1f} us")
+    print(f"    max    = {np.max(resp):.1f} us")
+    print(f"    over   = {resp_color}{fci['resp_over']}{RST} iterations ({resp_pct:.2f}%)")
+    print()
+
+    print(f"  {BOLD}Robot clock (robot_state.time){RST}")
+    if fci["skipped"] > 0:
+        print(f"    skipped = {RED}{fci['skipped']}{RST} states in {fci['skip_gaps']} gaps "
+              f"(max gap {fci['max_gap_ms']} ms)")
+    else:
+        print(f"    skipped = {GREEN}0{RST} states (every tick seen)")
+    print()
+
+    drop_pct = fci["dropped"] * 100.0 / n_ticks
+    drop_color = GREEN if fci["dropped"] == 0 else YELLOW if drop_pct < 1.0 else RED
+    print(f"  {BOLD}Dropped commands (robot reused the previous torque){RST}")
+    print(f"    dropped \u2248 {drop_color}{fci['dropped']}{RST} ({drop_pct:.2f}% of ticks) "
+          f"in {fci['drop_events']} events")
+    if fci["drop_events"] > 0:
+        print(f"    {DIM}Likely cause, within {DROP_LOOKBACK} iterations before each event:{RST}")
+        for cause, count in fci["drop_causes"].items():
+            pct = count * 100.0 / fci["drop_events"]
+            print(f"      {cause:<16} {count:>5}  ({pct:5.1f}%)")
     print()
 
     # Per-phase breakdown

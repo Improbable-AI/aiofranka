@@ -1,13 +1,36 @@
 import os
-import mujoco 
+import sys
+import mujoco
 import mujoco.viewer
 from pathlib import Path
-import numpy as np 
+import numpy as np
 import time
-import requests 
+import requests
 from aiofranka.client import FrankaLockUnlock
 
 CUR_DIR = Path(__file__).parent.resolve()
+
+
+def set_macos_control_thread_qos():
+    """
+    Give the calling thread the scheduling that libfranka needs on macOS.
+
+    On macOS, libfranka busy-waits for robot states, which only keeps up with the
+    1 kHz control loop on a performance core. libfranka sets the QoS class
+    USER_INTERACTIVE for the thread that creates the Robot; call this at the start
+    of the thread that runs the control loop. Does nothing on other platforms or
+    when busy-waiting is disabled with LIBFRANKA_MACOS_BUSY_WAIT=0.
+
+    Returns:
+        bool: True if the QoS class was set.
+    """
+    if sys.platform != "darwin" or os.environ.get("LIBFRANKA_MACOS_BUSY_WAIT") == "0":
+        return False
+    import ctypes
+
+    QOS_CLASS_USER_INTERACTIVE = 0x21
+    libc = ctypes.CDLL(None)
+    return libc.pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0) == 0
 
 
 class RobotInterface: 
@@ -77,6 +100,14 @@ class RobotInterface:
         self.site_name = "attachment_site"
         self.site_id = self.model.site(self.site_name).id
 
+        # The first calls of these take a few hundred microseconds, which would miss
+        # the first control cycles. Make them once before the 1 kHz loop starts.
+        mujoco.mj_forward(self.model, self.data)
+        _ = self.data.site(self.site_id).xmat
+        jac = np.zeros((6, self.model.nv))
+        mujoco.mj_jacSite(self.model, self.data, jac[:3], jac[3:], self.site_id)
+        mujoco.mj_fullM(self.model, self.data, np.zeros((self.model.nv, self.model.nv)))
+
         if self.real: 
             import pylibfranka
             self.robot = pylibfranka.Robot(ip, pylibfranka.RealtimeConfig.kIgnore)
@@ -125,6 +156,10 @@ class RobotInterface:
         """
         if self.real:
             self.robot.stop()
+            # Release the torque controller right away. Its destructor cleans up the
+            # stopped motion, which should not happen at an arbitrary later point,
+            # e.g. when the interpreter exits.
+            self.torque_controller = None
 
 
 
