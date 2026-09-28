@@ -36,7 +36,7 @@ pip install -e .
 
 ### macOS (Apple Silicon)
 
-PyPI has no macOS build of pylibfranka, so `pip install aiofranka` does not work on macOS. Instead, install aiofranka from the `macos-support` branch. On macOS, it builds pylibfranka from source from [younghyopark/libfranka](https://github.com/younghyopark/libfranka/tree/macos-support), which needs the Xcode Command Line Tools and these Homebrew packages:
+PyPI has no macOS build of pylibfranka, so `pip install aiofranka` does not work on macOS. Instead, install aiofranka from GitHub. On macOS, it builds pylibfranka from source from [younghyopark/libfranka](https://github.com/younghyopark/libfranka/tree/macos-support), which needs the Xcode Command Line Tools and these Homebrew packages:
 
 ```bash
 xcode-select --install
@@ -46,7 +46,7 @@ brew install cmake pinocchio poco eigen console_bridge tinyxml2 fmt
 Then install into a conda environment or virtualenv. Do not use the conda `base` environment: its `fmt` package conflicts with Homebrew's and breaks the build.
 
 ```bash
-pip install "git+https://github.com/Improbable-AI/aiofranka@macos-support"
+pip install "git+https://github.com/Improbable-AI/aiofranka"
 ```
 
 Building pylibfranka takes a few minutes. pylibfranka links against the Homebrew packages at runtime, so keep them installed. If `brew upgrade` moves one of them to a new major version, rebuild pylibfranka:
