@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aiofranka"
-version = "0.5.0"
+version = "0.5.1"
 description = "A Python package for Franka robot control using asyncio."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -21,8 +21,10 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    # PyPI has no macOS build of pylibfranka. On macOS, install it from source first, see the README.
+    # PyPI has no official macOS build of pylibfranka. pylibfranka-macos is an unofficial one for
+    # Apple Silicon and macOS 15 (Darwin 24) or newer. On other Macs, build pylibfranka from source.
     "pylibfranka; sys_platform != 'darwin'",
+    "pylibfranka-macos; sys_platform == 'darwin' and platform_machine == 'arm64' and platform_release >= '24'",
     "ruckig",
     "numpy",
     "scipy",

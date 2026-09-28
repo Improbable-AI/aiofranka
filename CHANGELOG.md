@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1 - 2026-09-28
+
+### Highlights
+
+- On Apple Silicon Macs with macOS 15 or newer, depend on [pylibfranka-macos](https://pypi.org/project/pylibfranka-macos/), an unofficial macOS build of pylibfranka, so `pip install aiofranka` works without building pylibfranka from source.
+
 ## 0.5.0 - 2026-09-28
 
 ### Breaking changes

@@ -36,7 +36,9 @@ pip install -e .
 
 ### macOS (Apple Silicon)
 
-PyPI has no macOS build of pylibfranka, so on macOS, aiofranka does not install it. Install pylibfranka from source from [younghyopark/libfranka](https://github.com/younghyopark/libfranka/tree/macos-support), a fork with macOS support, before aiofranka. Building it needs the Xcode Command Line Tools and these Homebrew packages:
+On Apple Silicon Macs with macOS 15 or newer, `pip install aiofranka` also installs [pylibfranka-macos](https://pypi.org/project/pylibfranka-macos/), an unofficial macOS build of pylibfranka from [younghyopark/libfranka](https://github.com/younghyopark/libfranka/tree/macos-support), a fork with macOS support. It is not affiliated with Franka Robotics and bundles its native dependencies, so it needs no Homebrew. It installs the same `pylibfranka` module as a pylibfranka that you built from source, so uninstall that first with `pip uninstall pylibfranka`.
+
+On other Macs, build pylibfranka from source before installing aiofranka. Building it needs the Xcode Command Line Tools and these Homebrew packages:
 
 ```bash
 xcode-select --install
@@ -50,7 +52,7 @@ pip install "pylibfranka @ git+https://github.com/younghyopark/libfranka@macos-s
 pip install aiofranka
 ```
 
-Building pylibfranka takes a few minutes. pylibfranka links against the Homebrew packages at runtime, so keep them installed. If `brew upgrade` moves one of them to a new major version, rebuild pylibfranka:
+Building pylibfranka takes a few minutes. A pylibfranka built from source links against the Homebrew packages at runtime, so keep them installed. If `brew upgrade` moves one of them to a new major version, rebuild pylibfranka:
 
 ```bash
 pip install --force-reinstall --no-cache-dir --no-deps "pylibfranka @ git+https://github.com/younghyopark/libfranka@macos-support#subdirectory=pylibfranka"

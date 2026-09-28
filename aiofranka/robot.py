@@ -35,21 +35,21 @@ def set_macos_control_thread_qos():
 
 _MACOS_PYLIBFRANKA_MISSING = """pylibfranka is not installed.
 
-PyPI has no macOS build of pylibfranka. Install it from source from
-younghyopark/libfranka, a fork with macOS support:
+PyPI has no official macOS build of pylibfranka. On Apple Silicon Macs with
+macOS 15 or newer, install the unofficial build:
 
-    pip install "pylibfranka @ git+https://github.com/younghyopark/libfranka@macos-support#subdirectory=pylibfranka"
+    pip install pylibfranka-macos
 
-This needs the Xcode Command Line Tools and some Homebrew packages, see
-https://github.com/Improbable-AI/aiofranka#macos-apple-silicon"""
+On other Macs, build it from source from younghyopark/libfranka, a fork with
+macOS support, see https://github.com/Improbable-AI/aiofranka#macos-apple-silicon"""
 
 
 def require_pylibfranka():
     """
     Import pylibfranka, explaining how to install it on macOS if it is missing.
 
-    aiofranka does not depend on pylibfranka on macOS, because PyPI has no macOS
-    build of it.
+    On macOS, aiofranka only depends on pylibfranka-macos, an unofficial build of
+    pylibfranka, for Apple Silicon and macOS 15 or newer.
 
     Returns:
         module: The pylibfranka module.
