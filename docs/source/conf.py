@@ -4,6 +4,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
 import os
+import re
 import sys
 sys.path.insert(0, os.path.abspath('../..'))
 
@@ -25,7 +26,9 @@ sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 project = 'aiofranka'
 copyright = '2025, MIT Improbable AI Lab'
 author = 'MIT Improbable AI Lab'
-release = '0.2.0'
+# Read the version from pyproject.toml so the docs can't drift from the package.
+with open(os.path.abspath('../../pyproject.toml')) as f:
+    release = re.search(r'^version = "(.+)"', f.read(), re.M).group(1)
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

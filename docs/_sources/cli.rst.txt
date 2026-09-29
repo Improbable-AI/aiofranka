@@ -1,19 +1,23 @@
 CLI Reference
 =============
 
-The CLI handles robot setup and diagnostics. The server itself is started from Python (see :doc:`quickstart`).
+The CLI handles robot setup, server lifecycle, and diagnostics.
 
 .. code-block:: text
 
+   aiofranka start-server [--ip IP] [--no-home]  Start the control server
    aiofranka unlock   [--ip IP]              Unlock joints + activate FCI
    aiofranka lock     [--ip IP]              Lock joints + deactivate FCI
    aiofranka gravcomp [--ip IP] [--damping]  Gravity compensation (freedrive)
+   aiofranka home     [--ip IP]              Move the robot to its home pose
    aiofranka status   [--ip IP]              Show robot & server status
    aiofranka stop     [--ip IP]              Stop a running server
    aiofranka mode     [--ip IP] [--set MODE] View/change operating mode
    aiofranka config   [--ip IP] [--mass M]   View/set end-effector config
    aiofranka selftest [--ip IP] [--force]    Run safety self-tests
    aiofranka log      [-n LINES] [-f]        View server logs
+   aiofranka gripper  --open|--close          Control the Robotiq gripper
+   aiofranka rt-benchmark [--duration SEC]    Benchmark the 1 kHz control loop
 
 unlock / lock
 -------------
@@ -42,7 +46,8 @@ gravcomp
 --------
 
 Runs gravity compensation mode in the foreground. The robot is freely movable by hand.
-Press Ctrl+C to stop and lock.
+Press Ctrl+C to stop control; the joints remain unlocked with FCI active.
+Run ``aiofranka lock`` when finished.
 
 .. code-block:: bash
 

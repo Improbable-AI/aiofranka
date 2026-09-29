@@ -6,16 +6,16 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Async Utilities &mdash; aiofranka 0.2.0 documentation</title>
+  <title>Async Utilities &mdash; aiofranka 0.5.1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
-      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=938c9ccc"></script>
-      <script src="../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/documentation_options.js?v=b9afe91b"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -147,8 +147,8 @@ result = policy.get_action.sync(obs)</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="aiofranka.async_utils.CudaInferenceThread">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">aiofranka.async_utils.</span></span><span class="sig-name descname"><span class="pre">CudaInferenceThread</span></span><a class="reference internal" href="../_modules/aiofranka/async_utils.html#CudaInferenceThread"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aiofranka.async_utils.CudaInferenceThread" title="Link to this definition"></a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">aiofranka.async_utils.</span></span><span class="sig-name descname"><span class="pre">CudaInferenceThread</span></span><a class="reference internal" href="../_modules/aiofranka/async_utils.html#CudaInferenceThread"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aiofranka.async_utils.CudaInferenceThread" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <p>A persistent thread for CUDA inference that avoids run_in_executor overhead.</p>
 <p>run_in_executor dispatches to a thread pool, which causes ~40x slowdown for
 CUDA ops due to thread-pool dispatch and CUDA cross-thread synchronization.
@@ -191,7 +191,7 @@ context, so the per-call cost is just a queue round-trip (~microseconds).</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="aiofranka.async_utils.CudaInferenceThread.run">
-<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fn</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/aiofranka/async_utils.html#CudaInferenceThread.run"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aiofranka.async_utils.CudaInferenceThread.run" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fn</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/aiofranka/async_utils.html#CudaInferenceThread.run"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aiofranka.async_utils.CudaInferenceThread.run" title="Link to this definition"></a></dt>
 <dd><p>Submit a callable and await the result.</p>
 </dd></dl>
 
@@ -205,8 +205,8 @@ context, so the per-call cost is just a queue round-trip (~microseconds).</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="aiofranka.async_utils.ProcessProxy">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">aiofranka.async_utils.</span></span><span class="sig-name descname"><span class="pre">ProcessProxy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">process</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/aiofranka/async_utils.html#ProcessProxy"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aiofranka.async_utils.ProcessProxy" title="Link to this definition"></a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">aiofranka.async_utils.</span></span><span class="sig-name descname"><span class="pre">ProcessProxy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">process</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/aiofranka/async_utils.html#ProcessProxy"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aiofranka.async_utils.ProcessProxy" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <p>Transparent proxy to an object living in a separate process.</p>
 <p>All attribute access and method calls are forwarded to the child process
 via a pipe. This completely avoids GIL contention — the child has its own
@@ -237,7 +237,7 @@ process. Use <code class="docutils literal notranslate"><span class="pre">await<
     <span class="n">model</span><span class="p">,</span> <span class="n">config</span> <span class="o">=</span> <span class="n">load_model</span><span class="p">(</span><span class="n">checkpoint</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">ACTInferencePolicy</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
 
-<span class="n">policy</span> <span class="o">=</span> <span class="n">mpify</span><span class="p">(</span><span class="n">make_policy</span><span class="p">,</span> <span class="n">checkpoint</span><span class="p">,</span> <span class="s2">&quot;cuda:0&quot;</span><span class="p">)</span>
+<span class="n">policy</span> <span class="o">=</span> <span class="n">mpify</span><span class="p">(</span><span class="n">make_policy</span><span class="p">,</span> <span class="n">checkpoint</span><span class="p">,</span> <span class="s2">"cuda:0"</span><span class="p">)</span>
 
 <span class="k">await</span> <span class="n">policy</span><span class="o">.</span><span class="n">reset</span><span class="p">(</span><span class="n">initial_ee</span><span class="p">)</span>
 <span class="n">ee</span> <span class="o">=</span> <span class="k">await</span> <span class="n">policy</span><span class="o">.</span><span class="n">get_action</span><span class="p">(</span><span class="n">ee</span><span class="p">,</span> <span class="n">qpos</span><span class="p">,</span> <span class="n">task_type</span><span class="p">)</span>
@@ -264,19 +264,19 @@ process. Use <code class="docutils literal notranslate"><span class="pre">await<
 
 <dl class="py function">
 <dt class="sig sig-object py" id="aiofranka.async_utils.async_input">
-<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">aiofranka.async_utils.</span></span><span class="sig-name descname"><span class="pre">async_input</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prompt</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/aiofranka/async_utils.html#async_input"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aiofranka.async_utils.async_input" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">aiofranka.async_utils.</span></span><span class="sig-name descname"><span class="pre">async_input</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prompt</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/aiofranka/async_utils.html#async_input"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aiofranka.async_utils.async_input" title="Link to this definition"></a></dt>
 <dd><p>Async-safe replacement for built-in <code class="docutils literal notranslate"><span class="pre">input()</span></code>.</p>
 <p>Runs <code class="docutils literal notranslate"><span class="pre">input()</span></code> in a thread executor so the event loop (and the 1kHz
 control loop) keeps running while waiting for user input:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">await</span> <span class="n">async_input</span><span class="p">(</span><span class="s2">&quot;Press Enter to start...&quot;</span><span class="p">)</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">await</span> <span class="n">async_input</span><span class="p">(</span><span class="s2">"Press Enter to start..."</span><span class="p">)</span>
 </pre></div>
 </div>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>prompt</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p>
+<dd class="field-odd"><p><strong>prompt</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
 </dd>
 </dl>
 </dd></dl>

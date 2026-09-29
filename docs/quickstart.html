@@ -6,16 +6,16 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Quick Start &mdash; aiofranka 0.2.0 documentation</title>
+  <title>Quick Start &mdash; aiofranka 0.5.1 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
-      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=938c9ccc"></script>
-      <script src="_static/doctools.js?v=9bcbadda"></script>
-      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/documentation_options.js?v=b9afe91b"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -46,7 +46,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Quick Start</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#server-mode-recommended">Server Mode (Recommended)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#server-mode">Server Mode</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#async-mode">Async Mode</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#server-mode-vs-async-mode">Server Mode vs Async Mode</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#unlocking-and-locking">Unlocking and Locking</a></li>
@@ -100,11 +100,11 @@
 <h1>Quick Start<a class="headerlink" href="#quick-start" title="Link to this heading"></a></h1>
 <p>This guide will get you controlling a Franka robot in minutes. There are two ways to use aiofranka:</p>
 <ul class="simple">
-<li><p><strong>Server mode</strong> (recommended) — sync Python API, 1kHz loop in a subprocess</p></li>
+<li><p><strong>Server mode</strong> — sync Python API, 1kHz loop in a subprocess</p></li>
 <li><p><strong>Async mode</strong> — everything in a single process using <code class="docutils literal notranslate"><span class="pre">asyncio</span></code></p></li>
 </ul>
-<section id="server-mode-recommended">
-<h2>Server Mode (Recommended)<a class="headerlink" href="#server-mode-recommended" title="Link to this heading"></a></h2>
+<section id="server-mode">
+<h2>Server Mode<a class="headerlink" href="#server-mode" title="Link to this heading"></a></h2>
 <p>Server mode runs the 1kHz control loop in a subprocess. Your scripts use a plain synchronous API — no <code class="docutils literal notranslate"><span class="pre">async</span></code>/<code class="docutils literal notranslate"><span class="pre">await</span></code> needed.</p>
 <ul class="simple">
 <li><p><strong>No async/await</strong> — plain Python scripts, easy to integrate with existing codebases</p></li>
@@ -126,7 +126,7 @@
 <span class="n">controller</span><span class="o">.</span><span class="n">move</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.57079</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">1.57079</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.7853</span><span class="p">])</span>
 
 <span class="c1"># 4. Switch to impedance control</span>
-<span class="n">controller</span><span class="o">.</span><span class="n">switch</span><span class="p">(</span><span class="s2">&quot;impedance&quot;</span><span class="p">)</span>
+<span class="n">controller</span><span class="o">.</span><span class="n">switch</span><span class="p">(</span><span class="s2">"impedance"</span><span class="p">)</span>
 <span class="n">controller</span><span class="o">.</span><span class="n">kp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="mf">80.0</span>
 <span class="n">controller</span><span class="o">.</span><span class="n">kd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="mf">4.0</span>
 <span class="n">controller</span><span class="o">.</span><span class="n">set_freq</span><span class="p">(</span><span class="mi">50</span><span class="p">)</span>
@@ -135,7 +135,7 @@
 <span class="k">for</span> <span class="n">cnt</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">):</span>
     <span class="n">state</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">state</span>
     <span class="n">delta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">cnt</span> <span class="o">/</span> <span class="mf">50.0</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
-    <span class="n">controller</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;q_desired&quot;</span><span class="p">,</span> <span class="n">delta</span> <span class="o">+</span> <span class="n">controller</span><span class="o">.</span><span class="n">initial_qpos</span><span class="p">)</span>
+    <span class="n">controller</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"q_desired"</span><span class="p">,</span> <span class="n">delta</span> <span class="o">+</span> <span class="n">controller</span><span class="o">.</span><span class="n">initial_qpos</span><span class="p">)</span>
 
 <span class="c1"># 6. Stop server and lock robot</span>
 <span class="n">controller</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
@@ -158,13 +158,13 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">aiofranka</span><span class="w"> </span><span class="kn">import</span> <span class="n">RobotInterface</span><span class="p">,</span> <span class="n">FrankaController</span>
 
 <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
-    <span class="n">robot</span> <span class="o">=</span> <span class="n">RobotInterface</span><span class="p">(</span><span class="s2">&quot;172.16.0.2&quot;</span><span class="p">)</span>
+    <span class="n">robot</span> <span class="o">=</span> <span class="n">RobotInterface</span><span class="p">(</span><span class="s2">"172.16.0.2"</span><span class="p">)</span>
     <span class="n">controller</span> <span class="o">=</span> <span class="n">FrankaController</span><span class="p">(</span><span class="n">robot</span><span class="p">)</span>
 
     <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
     <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">move</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.57079</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">1.57079</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.7853</span><span class="p">])</span>
 
-    <span class="n">controller</span><span class="o">.</span><span class="n">switch</span><span class="p">(</span><span class="s2">&quot;impedance&quot;</span><span class="p">)</span>
+    <span class="n">controller</span><span class="o">.</span><span class="n">switch</span><span class="p">(</span><span class="s2">"impedance"</span><span class="p">)</span>
     <span class="n">controller</span><span class="o">.</span><span class="n">kp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="mf">80.0</span>
     <span class="n">controller</span><span class="o">.</span><span class="n">kd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="mf">4.0</span>
     <span class="n">controller</span><span class="o">.</span><span class="n">set_freq</span><span class="p">(</span><span class="mi">50</span><span class="p">)</span>
@@ -172,11 +172,11 @@
     <span class="k">for</span> <span class="n">cnt</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">):</span>
         <span class="n">delta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">cnt</span> <span class="o">/</span> <span class="mf">50.0</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
         <span class="n">init</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">initial_qpos</span>
-        <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;q_desired&quot;</span><span class="p">,</span> <span class="n">delta</span> <span class="o">+</span> <span class="n">init</span><span class="p">)</span>
+        <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"q_desired"</span><span class="p">,</span> <span class="n">delta</span> <span class="o">+</span> <span class="n">init</span><span class="p">)</span>
 
     <span class="k">await</span> <span class="n">controller</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
 
-<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">"__main__"</span><span class="p">:</span>
     <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">main</span><span class="p">())</span>
 </pre></div>
 </div>
@@ -255,12 +255,12 @@ aiofranka<span class="w"> </span>lock
 <p>Robot state is continuously updated at 1kHz and accessible via <code class="docutils literal notranslate"><span class="pre">controller.state</span></code>:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">state</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">state</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Joint positions: </span><span class="si">{</span><span class="n">state</span><span class="p">[</span><span class="s1">&#39;qpos&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>        <span class="c1"># (7,) [rad]</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Joint velocities: </span><span class="si">{</span><span class="n">state</span><span class="p">[</span><span class="s1">&#39;qvel&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>       <span class="c1"># (7,) [rad/s]</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;End-effector pose:</span><span class="se">\n</span><span class="si">{</span><span class="n">state</span><span class="p">[</span><span class="s1">&#39;ee&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>       <span class="c1"># (4, 4) homogeneous transform</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Jacobian:</span><span class="se">\n</span><span class="si">{</span><span class="n">state</span><span class="p">[</span><span class="s1">&#39;jac&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>               <span class="c1"># (6, 7)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Mass matrix:</span><span class="se">\n</span><span class="si">{</span><span class="n">state</span><span class="p">[</span><span class="s1">&#39;mm&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>             <span class="c1"># (7, 7)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Last torques: </span><span class="si">{</span><span class="n">state</span><span class="p">[</span><span class="s1">&#39;last_torque&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>    <span class="c1"># (7,) [Nm]</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Joint positions: </span><span class="si">{</span><span class="n">state</span><span class="p">[</span><span class="s1">'qpos'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>        <span class="c1"># (7,) [rad]</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Joint velocities: </span><span class="si">{</span><span class="n">state</span><span class="p">[</span><span class="s1">'qvel'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>       <span class="c1"># (7,) [rad/s]</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"End-effector pose:</span><span class="se">\n</span><span class="si">{</span><span class="n">state</span><span class="p">[</span><span class="s1">'ee'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>       <span class="c1"># (4, 4) homogeneous transform</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Jacobian:</span><span class="se">\n</span><span class="si">{</span><span class="n">state</span><span class="p">[</span><span class="s1">'jac'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>               <span class="c1"># (6, 7)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Mass matrix:</span><span class="se">\n</span><span class="si">{</span><span class="n">state</span><span class="p">[</span><span class="s1">'mm'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>             <span class="c1"># (7, 7)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Last torques: </span><span class="si">{</span><span class="n">state</span><span class="p">[</span><span class="s1">'last_torque'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>    <span class="c1"># (7,) [Nm]</span>
 </pre></div>
 </div>
 <p>Additional state available on the controller:</p>
@@ -278,7 +278,7 @@ aiofranka<span class="w"> </span>lock
 
 <span class="c1"># Automatically sleeps to maintain 50Hz timing</span>
 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">):</span>
-    <span class="n">controller</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;q_desired&quot;</span><span class="p">,</span> <span class="n">compute_target</span><span class="p">())</span>
+    <span class="n">controller</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"q_desired"</span><span class="p">,</span> <span class="n">compute_target</span><span class="p">())</span>
 </pre></div>
 </div>
 <p>Each <code class="docutils literal notranslate"><span class="pre">set()</span></code> call sleeps for the remainder of the period, so the loop maintains consistent timing even if your computation time varies.</p>

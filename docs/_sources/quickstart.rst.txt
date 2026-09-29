@@ -3,7 +3,7 @@ Quick Start
 
 This guide will get you controlling a Franka robot in minutes. There are two ways to use aiofranka:
 
-- **Server mode**  — sync Python API, 1kHz loop in a subprocess
+- **Server mode** — sync Python API, 1kHz loop in a subprocess
 - **Async mode** — everything in a single process using ``asyncio``
 
 Server Mode

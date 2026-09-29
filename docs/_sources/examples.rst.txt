@@ -341,15 +341,16 @@ Test your controller in simulation before deploying to real robot (async mode on
 More Examples
 -------------
 
-For more examples, check the ``examples/`` directory in the repository:
+The ``examples/`` directory in the repository has minimal async mode scripts. Each takes the robot
+IP as an optional argument and runs in MuJoCo without it:
 
-- ``01_collect_ref_traj.py``: System identification data collection (async mode)
-- ``01_collect_ref_traj_remote.py``: System identification data collection (server mode)
-- ``02_spacemouse_teleop.py``: SpaceMouse teleoperation with cameras (async mode)
-- ``02_spacemouse_teleop_remote.py``: SpaceMouse teleoperation with cameras (server mode)
-- ``03_sysid.py``: System identification with CMA-ES optimization
-- ``04_gripper.py``: Robotiq gripper toggle demo
-- ``05_gripper_sysid.py``: Gripper system identification
+- ``00_move.py``: Move one joint (``--joint``, ``--delta``)
+- ``01_joint_impedance.py``: Hold the current joint positions with joint impedance control
+- ``02_osc_hold.py``: Hold the current end-effector pose with operational space control
+- ``03_zero_torque.py``: Stream zero torque, so the robot only compensates gravity
+
+Research scripts (system identification, SpaceMouse teleoperation, Robotiq gripper) are on the
+`research-scripts <https://github.com/younghyopark/aiofranka/tree/research-scripts>`_ branch.
 
 Next Steps
 ----------
