@@ -60,20 +60,15 @@
 <li class="toctree-l1"><a class="reference internal" href="server.html">Server Functions</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">GripperController</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#aiofranka.gripper.GripperController"><code class="docutils literal notranslate"><span class="pre">GripperController</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#aiofranka.gripper.GripperController.q_desired"><code class="docutils literal notranslate"><span class="pre">GripperController.q_desired</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#aiofranka.gripper.GripperController.qpos"><code class="docutils literal notranslate"><span class="pre">GripperController.qpos</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#aiofranka.gripper.GripperController.speed"><code class="docutils literal notranslate"><span class="pre">GripperController.speed</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#aiofranka.gripper.GripperController.force"><code class="docutils literal notranslate"><span class="pre">GripperController.force</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#aiofranka.gripper.GripperController.state"><code class="docutils literal notranslate"><span class="pre">GripperController.state</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aiofranka.gripper.GripperController.running"><code class="docutils literal notranslate"><span class="pre">GripperController.running</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aiofranka.gripper.GripperController.__init__"><code class="docutils literal notranslate"><span class="pre">GripperController.__init__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#id0"><code class="docutils literal notranslate"><span class="pre">GripperController.q_desired</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aiofranka.gripper.GripperController.q_desired"><code class="docutils literal notranslate"><span class="pre">GripperController.q_desired</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aiofranka.gripper.GripperController.position"><code class="docutils literal notranslate"><span class="pre">GripperController.position</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#id1"><code class="docutils literal notranslate"><span class="pre">GripperController.speed</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#id2"><code class="docutils literal notranslate"><span class="pre">GripperController.force</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#id3"><code class="docutils literal notranslate"><span class="pre">GripperController.qpos</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aiofranka.gripper.GripperController.speed"><code class="docutils literal notranslate"><span class="pre">GripperController.speed</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aiofranka.gripper.GripperController.force"><code class="docutils literal notranslate"><span class="pre">GripperController.force</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aiofranka.gripper.GripperController.qpos"><code class="docutils literal notranslate"><span class="pre">GripperController.qpos</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aiofranka.gripper.GripperController.current_position"><code class="docutils literal notranslate"><span class="pre">GripperController.current_position</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#id4"><code class="docutils literal notranslate"><span class="pre">GripperController.state</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aiofranka.gripper.GripperController.state"><code class="docutils literal notranslate"><span class="pre">GripperController.state</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aiofranka.gripper.GripperController.set_freq"><code class="docutils literal notranslate"><span class="pre">GripperController.set_freq()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aiofranka.gripper.GripperController.set"><code class="docutils literal notranslate"><span class="pre">GripperController.set()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aiofranka.gripper.GripperController.start"><code class="docutils literal notranslate"><span class="pre">GripperController.start()</span></code></a></li>
@@ -143,61 +138,6 @@ sends commands while you update the target position.</p>
 sends goTo commands. You only need to set the target position - the loop
 handles the communication.</p>
 <dl class="py attribute">
-<dt class="sig sig-object py" id="aiofranka.gripper.GripperController.q_desired">
-<span class="sig-name descname"><span class="pre">q_desired</span></span><a class="headerlink" href="#aiofranka.gripper.GripperController.q_desired" title="Link to this definition"></a></dt>
-<dd><p>Target gripper position (0=open, 255=closed)</p>
-<dl class="field-list simple">
-<dt class="field-odd">Type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a></p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="aiofranka.gripper.GripperController.qpos">
-<span class="sig-name descname"><span class="pre">qpos</span></span><a class="headerlink" href="#aiofranka.gripper.GripperController.qpos" title="Link to this definition"></a></dt>
-<dd><p>Current gripper position (read-only)</p>
-<dl class="field-list simple">
-<dt class="field-odd">Type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a></p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="aiofranka.gripper.GripperController.speed">
-<span class="sig-name descname"><span class="pre">speed</span></span><a class="headerlink" href="#aiofranka.gripper.GripperController.speed" title="Link to this definition"></a></dt>
-<dd><p>Gripper speed setting (1-255), like kp gain</p>
-<dl class="field-list simple">
-<dt class="field-odd">Type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a></p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="aiofranka.gripper.GripperController.force">
-<span class="sig-name descname"><span class="pre">force</span></span><a class="headerlink" href="#aiofranka.gripper.GripperController.force" title="Link to this definition"></a></dt>
-<dd><p>Gripper force setting (0-255), like kd gain</p>
-<dl class="field-list simple">
-<dt class="field-odd">Type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a></p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="aiofranka.gripper.GripperController.state">
-<span class="sig-name descname"><span class="pre">state</span></span><a class="headerlink" href="#aiofranka.gripper.GripperController.state" title="Link to this definition"></a></dt>
-<dd><p>Current gripper state (qpos, q_desired, speed, force)</p>
-<dl class="field-list simple">
-<dt class="field-odd">Type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.14)">dict</a></p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py attribute">
 <dt class="sig sig-object py" id="aiofranka.gripper.GripperController.running">
 <span class="sig-name descname"><span class="pre">running</span></span><a class="headerlink" href="#aiofranka.gripper.GripperController.running" title="Link to this definition"></a></dt>
 <dd><p>Whether control loop is active</p>
@@ -256,8 +196,8 @@ handles the communication.</p>
 </dd></dl>
 
 <dl class="py property">
-<dt class="sig sig-object py" id="id0">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">q_desired</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="headerlink" href="#id0" title="Link to this definition"></a></dt>
+<dt class="sig sig-object py" id="aiofranka.gripper.GripperController.q_desired">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">q_desired</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="headerlink" href="#aiofranka.gripper.GripperController.q_desired" title="Link to this definition"></a></dt>
 <dd><p>Target gripper position (0=open, 255=closed).</p>
 </dd></dl>
 
@@ -268,20 +208,20 @@ handles the communication.</p>
 </dd></dl>
 
 <dl class="py property">
-<dt class="sig sig-object py" id="id1">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">speed</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="headerlink" href="#id1" title="Link to this definition"></a></dt>
+<dt class="sig sig-object py" id="aiofranka.gripper.GripperController.speed">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">speed</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="headerlink" href="#aiofranka.gripper.GripperController.speed" title="Link to this definition"></a></dt>
 <dd><p>Gripper speed (1-255). Higher = faster. Like kp gain.</p>
 </dd></dl>
 
 <dl class="py property">
-<dt class="sig sig-object py" id="id2">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">force</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="headerlink" href="#id2" title="Link to this definition"></a></dt>
+<dt class="sig sig-object py" id="aiofranka.gripper.GripperController.force">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">force</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="headerlink" href="#aiofranka.gripper.GripperController.force" title="Link to this definition"></a></dt>
 <dd><p>Gripper force (0-255). Higher = stronger grip. Like kd gain.</p>
 </dd></dl>
 
 <dl class="py property">
-<dt class="sig sig-object py" id="id3">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">qpos</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="headerlink" href="#id3" title="Link to this definition"></a></dt>
+<dt class="sig sig-object py" id="aiofranka.gripper.GripperController.qpos">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">qpos</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="headerlink" href="#aiofranka.gripper.GripperController.qpos" title="Link to this definition"></a></dt>
 <dd><p>Current gripper position (read-only).</p>
 </dd></dl>
 
@@ -292,9 +232,9 @@ handles the communication.</p>
 </dd></dl>
 
 <dl class="py property">
-<dt class="sig sig-object py" id="id4">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">state</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.14)"><span class="pre">dict</span></a></span><a class="headerlink" href="#id4" title="Link to this definition"></a></dt>
-<dd><p>Current gripper state dictionary.</p>
+<dt class="sig sig-object py" id="aiofranka.gripper.GripperController.state">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">state</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.14)"><span class="pre">dict</span></a></span><a class="headerlink" href="#aiofranka.gripper.GripperController.state" title="Link to this definition"></a></dt>
+<dd><p>Current gripper state as a dict with qpos, q_desired, speed, force and error.</p>
 </dd></dl>
 
 <dl class="py method">

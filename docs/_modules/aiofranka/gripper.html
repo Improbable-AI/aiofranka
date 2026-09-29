@@ -126,11 +126,6 @@
 <span class="sd">    handles the communication.</span>
 <span class="sd">    </span>
 <span class="sd">    Attributes:</span>
-<span class="sd">        q_desired (int): Target gripper position (0=open, 255=closed)</span>
-<span class="sd">        qpos (int): Current gripper position (read-only)</span>
-<span class="sd">        speed (int): Gripper speed setting (1-255), like kp gain</span>
-<span class="sd">        force (int): Gripper force setting (0-255), like kd gain</span>
-<span class="sd">        state (dict): Current gripper state (qpos, q_desired, speed, force)</span>
 <span class="sd">        running (bool): Whether control loop is active</span>
 <span class="sd">        </span>
 <span class="sd">    Args:</span>
@@ -261,7 +256,7 @@
     
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Current gripper state dictionary."""</span>
+<span class="w">        </span><span class="sd">"""Current gripper state as a dict with qpos, q_desired, speed, force and error."""</span>
         <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state_lock</span><span class="p">:</span>
             <span class="k">return</span> <span class="p">{</span>
                 <span class="s1">'qpos'</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_current_position</span><span class="p">,</span>

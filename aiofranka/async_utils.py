@@ -4,7 +4,8 @@ After controller.start(), the asyncio event loop must not be blocked for more
 than ~1ms.  These helpers offload synchronous work to a thread executor so the
 real-time loop keeps running.
 
-Usage:
+Usage::
+
     from aiofranka import asyncify
 
     # Decorator
@@ -197,8 +198,8 @@ def _mp_worker(conn, factory_fn, factory_args, factory_kwargs):
 
 
 def mpify(factory_fn, *args, **kwargs):
-    """Spawn a child process, run factory_fn(*args, **kwargs) in it, and return
-    a transparent async proxy to the created object.
+    """Spawn a child process, run ``factory_fn(*args, **kwargs)`` in it, and
+    return a transparent async proxy to the created object.
 
     The proxy forwards all method calls and attribute access to the child
     process. Use ``await`` on every access since it crosses a process boundary.
@@ -220,7 +221,8 @@ def mpify(factory_fn, *args, **kwargs):
     Args:
         factory_fn: Callable that creates the object. Must be picklable
             (module-level function). Runs in the child process.
-        *args, **kwargs: Passed to factory_fn.
+        *args: Passed to factory_fn.
+        **kwargs: Passed to factory_fn.
 
     Returns:
         ProcessProxy that forwards attribute/method access to the child.

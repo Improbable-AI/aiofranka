@@ -111,25 +111,25 @@ See <a class="reference internal" href="../async_mode.html"><span class="doc">As
 <p>After controller.start(), the asyncio event loop must not be blocked for more
 than ~1ms.  These helpers offload synchronous work to a thread executor so the
 real-time loop keeps running.</p>
-<dl>
-<dt>Usage:</dt><dd><p>from aiofranka import asyncify</p>
-<p># Decorator
-class MyPolicy:</p>
-<blockquote>
-<div><p>&#64;asyncify
-def get_action(self, obs):</p>
-<blockquote>
-<div><p>return self.model(obs)</p>
-</div></blockquote>
-</div></blockquote>
-<p>action = await policy.get_action(obs)</p>
-<p># Wrap an existing function
-model_async = asyncify(model)
-result = await model_async(input_tensor)</p>
-<p># Original sync function is accessible via .sync
-result = policy.get_action.sync(obs)</p>
-</dd>
-</dl>
+<p>Usage:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">aiofranka</span><span class="w"> </span><span class="kn">import</span> <span class="n">asyncify</span>
+
+<span class="c1"># Decorator</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">MyPolicy</span><span class="p">:</span>
+    <span class="nd">@asyncify</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_action</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obs</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">obs</span><span class="p">)</span>
+
+<span class="n">action</span> <span class="o">=</span> <span class="k">await</span> <span class="n">policy</span><span class="o">.</span><span class="n">get_action</span><span class="p">(</span><span class="n">obs</span><span class="p">)</span>
+
+<span class="c1"># Wrap an existing function</span>
+<span class="n">model_async</span> <span class="o">=</span> <span class="n">asyncify</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">model_async</span><span class="p">(</span><span class="n">input_tensor</span><span class="p">)</span>
+
+<span class="c1"># Original sync function is accessible via .sync</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">policy</span><span class="o">.</span><span class="n">get_action</span><span class="o">.</span><span class="n">sync</span><span class="p">(</span><span class="n">obs</span><span class="p">)</span>
+</pre></div>
+</div>
 <dl class="py function">
 <dt class="sig sig-object py" id="aiofranka.async_utils.asyncify">
 <span class="sig-prename descclassname"><span class="pre">aiofranka.async_utils.</span></span><span class="sig-name descname"><span class="pre">asyncify</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fn</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/aiofranka/async_utils.html#asyncify"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aiofranka.async_utils.asyncify" title="Link to this definition"></a></dt>
@@ -228,8 +228,8 @@ GIL, so a 1kHz control loop on the main process cannot interfere.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="aiofranka.async_utils.mpify">
 <span class="sig-prename descclassname"><span class="pre">aiofranka.async_utils.</span></span><span class="sig-name descname"><span class="pre">mpify</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">factory_fn</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/aiofranka/async_utils.html#mpify"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aiofranka.async_utils.mpify" title="Link to this definition"></a></dt>
-<dd><p>Spawn a child process, run factory_fn(<a href="#id1"><span class="problematic" id="id2">*</span></a>args, <a href="#id3"><span class="problematic" id="id4">**</span></a>kwargs) in it, and return
-a transparent async proxy to the created object.</p>
+<dd><p>Spawn a child process, run <code class="docutils literal notranslate"><span class="pre">factory_fn(*args,</span> <span class="pre">**kwargs)</span></code> in it, and
+return a transparent async proxy to the created object.</p>
 <p>The proxy forwards all method calls and attribute access to the child
 process. Use <code class="docutils literal notranslate"><span class="pre">await</span></code> on every access since it crosses a process boundary.</p>
 <p>Usage:</p>
@@ -252,8 +252,7 @@ process. Use <code class="docutils literal notranslate"><span class="pre">await<
 <li><p><strong>factory_fn</strong> – Callable that creates the object. Must be picklable
 (module-level function). Runs in the child process.</p></li>
 <li><p><strong>*args</strong> – Passed to factory_fn.</p></li>
-<li><p><strong>**kwargs</strong> – <p>Passed to factory_fn.</p>
-</p></li>
+<li><p><strong>**kwargs</strong> – Passed to factory_fn.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>

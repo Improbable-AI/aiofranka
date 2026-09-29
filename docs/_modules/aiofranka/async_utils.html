@@ -90,7 +90,8 @@
 <span class="sd">than ~1ms.  These helpers offload synchronous work to a thread executor so the</span>
 <span class="sd">real-time loop keeps running.</span>
 
-<span class="sd">Usage:</span>
+<span class="sd">Usage::</span>
+
 <span class="sd">    from aiofranka import asyncify</span>
 
 <span class="sd">    # Decorator</span>
@@ -315,8 +316,8 @@
 <div class="viewcode-block" id="mpify">
 <a class="viewcode-back" href="../../api/utilities.html#aiofranka.async_utils.mpify">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">mpify</span><span class="p">(</span><span class="n">factory_fn</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Spawn a child process, run factory_fn(*args, **kwargs) in it, and return</span>
-<span class="sd">    a transparent async proxy to the created object.</span>
+<span class="w">    </span><span class="sd">"""Spawn a child process, run ``factory_fn(*args, **kwargs)`` in it, and</span>
+<span class="sd">    return a transparent async proxy to the created object.</span>
 
 <span class="sd">    The proxy forwards all method calls and attribute access to the child</span>
 <span class="sd">    process. Use ``await`` on every access since it crosses a process boundary.</span>
@@ -338,7 +339,8 @@
 <span class="sd">    Args:</span>
 <span class="sd">        factory_fn: Callable that creates the object. Must be picklable</span>
 <span class="sd">            (module-level function). Runs in the child process.</span>
-<span class="sd">        *args, **kwargs: Passed to factory_fn.</span>
+<span class="sd">        *args: Passed to factory_fn.</span>
+<span class="sd">        **kwargs: Passed to factory_fn.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        ProcessProxy that forwards attribute/method access to the child.</span>

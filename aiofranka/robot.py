@@ -322,8 +322,8 @@ class RobotInterface:
         Caveats:
             - Must be called at ~1kHz for real robot to maintain control
             - Large torque changes may trigger safety limits
-            - Torques should respect robot limits: |tau_i| < 87 Nm for joints 1-4,
-              |tau_i| < 12 Nm for joints 5-7
+            - Torques should respect robot limits: ``|tau_i| < 87 Nm`` for joints 1-4,
+              ``|tau_i| < 12 Nm`` for joints 5-7
               
         Example:
             >>> # Send gravity compensation torques

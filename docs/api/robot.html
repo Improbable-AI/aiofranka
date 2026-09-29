@@ -410,8 +410,8 @@ are not needed. ~10x faster than full state property.</p>
 <dt>Caveats:</dt><dd><ul class="simple">
 <li><p>Must be called at ~1kHz for real robot to maintain control</p></li>
 <li><p>Large torque changes may trigger safety limits</p></li>
-<li><p>Torques should respect robot limits: <a href="#id1"><span class="problematic" id="id2">|tau_i|</span></a> &lt; 87 Nm for joints 1-4,
-<a href="#id3"><span class="problematic" id="id4">|tau_i|</span></a> &lt; 12 Nm for joints 5-7</p></li>
+<li><p>Torques should respect robot limits: <code class="docutils literal notranslate"><span class="pre">|tau_i|</span> <span class="pre">&lt;</span> <span class="pre">87</span> <span class="pre">Nm</span></code> for joints 1-4,
+<code class="docutils literal notranslate"><span class="pre">|tau_i|</span> <span class="pre">&lt;</span> <span class="pre">12</span> <span class="pre">Nm</span></code> for joints 5-7</p></li>
 </ul>
 </dd>
 </dl>

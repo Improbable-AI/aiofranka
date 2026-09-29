@@ -38,11 +38,6 @@ class GripperController:
     handles the communication.
     
     Attributes:
-        q_desired (int): Target gripper position (0=open, 255=closed)
-        qpos (int): Current gripper position (read-only)
-        speed (int): Gripper speed setting (1-255), like kp gain
-        force (int): Gripper force setting (0-255), like kd gain
-        state (dict): Current gripper state (qpos, q_desired, speed, force)
         running (bool): Whether control loop is active
         
     Args:
@@ -170,7 +165,7 @@ class GripperController:
     
     @property
     def state(self) -> dict:
-        """Current gripper state dictionary."""
+        """Current gripper state as a dict with qpos, q_desired, speed, force and error."""
         with self._state_lock:
             return {
                 'qpos': self._current_position,
