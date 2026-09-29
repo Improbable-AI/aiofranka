@@ -49,8 +49,8 @@ robotiq = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Improbable-AI/aiofranka"
-Repository = "https://github.com/Improbable-AI/aiofranka"
+Homepage = "https://github.com/younghyopark/aiofranka"
+Repository = "https://github.com/younghyopark/aiofranka"
 
 [tool.setuptools]
 include-package-data = false

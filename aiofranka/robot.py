@@ -41,7 +41,7 @@ macOS 15 or newer, install the unofficial build:
     pip install pylibfranka-macos
 
 On other Macs, build it from source from younghyopark/libfranka, a fork with
-macOS support, see https://github.com/Improbable-AI/aiofranka#macos-apple-silicon"""
+macOS support, see https://github.com/younghyopark/aiofranka#macos-apple-silicon"""
 
 
 def require_pylibfranka():

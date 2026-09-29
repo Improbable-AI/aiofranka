@@ -28,7 +28,7 @@ For development or to get the latest features:
 
 .. code-block:: bash
 
-   git clone https://github.com/Improbable-AI/aiofranka.git
+   git clone https://github.com/younghyopark/aiofranka.git
    cd aiofranka
    pip install -e .
 

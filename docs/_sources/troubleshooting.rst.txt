@@ -319,4 +319,4 @@ When asking for help, include:
 
 Where to ask:
 
-- **GitHub Issues**: https://github.com/Improbable-AI/aiofranka/issues
+- **GitHub Issues**: https://github.com/younghyopark/aiofranka/issues

@@ -33,7 +33,7 @@ This works on:
 
 Or for development:
 ```bash
-git clone https://github.com/Improbable-AI/aiofranka.git
+git clone https://github.com/younghyopark/aiofranka.git
 cd aiofranka
 pip install -e .
 ```
@@ -325,7 +325,7 @@ If you use this library in your research, please cite:
   author = {Park, Younghyo},
   title = {aiofranka: Asyncio-based Franka Robot Control},
   year = {2025},
-  url = {https://github.com/Improbable-AI/aiofranka}
+  url = {https://github.com/younghyopark/aiofranka}
 }
 ```
 

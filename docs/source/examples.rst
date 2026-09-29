@@ -350,7 +350,7 @@ IP as an optional argument and runs in MuJoCo without it:
 - ``03_zero_torque.py``: Stream zero torque, so the robot only compensates gravity
 
 Research scripts (system identification, SpaceMouse teleoperation, Robotiq gripper) are on the
-`research-scripts <https://github.com/Improbable-AI/aiofranka/tree/research-scripts>`_ branch.
+`research-scripts <https://github.com/younghyopark/aiofranka/tree/research-scripts>`_ branch.
 
 Next Steps
 ----------
