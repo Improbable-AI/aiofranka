@@ -12,6 +12,8 @@
   </a>
 </p>
 
+> **Note:** This repository was transferred from `Improbable-AI/aiofranka` to `younghyopark/aiofranka`. Old links and git remotes redirect here automatically.
+
 **aiofranka** is an asyncio-based Python library for controlling Franka Emika robots. It provides a high-level, asynchronous interface that combines **`pylibfranka`** for official low-level control interface (1kHz torque control), **`MuJoCo`** for kinematics/dynamics computation, **`Ruckig`** for  smooth trajectory generation.
 
 The library is designed for research applications requiring precise, real-time control with minimal latency and maximum flexibility.
