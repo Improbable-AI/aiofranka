@@ -9,3 +9,6 @@ null_kd: 2
 null_target: [1.6552, -1.0651, -1.6096, -2.3673, -1.2420, 1.9475, 0.8314]
 tcp: [0, 0, 0.230]
 frequency: 50
+
+recordings:
+- {path: ../../examples/sysid_data/osc_sysid_20261002_110636.npz, date: '2026-10-02T11:06:36', tool: lv1_tool}
