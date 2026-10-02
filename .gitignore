@@ -15,6 +15,20 @@ examples/sysid_left/
 examples/sysid_right/
 vel_results.zip
 
+docs/aiofranka_refs.bib
+docs/ieee.aux
+docs/ieee.bbl
+docs/ieee.blg
+docs/ieee.fdb_latexmk
+docs/ieee.fls
+docs/ieee.log
+docs/ieee.out
+docs/ieee.pdf
+docs/ieee.synctex.gz
+docs/ieee.tex
+docs/main.tex
+references/
+
 # Sphinx documentation
 # docs/_build/
 # docs/doctrees/

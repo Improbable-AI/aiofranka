@@ -12,3 +12,74 @@ frequency: 50
 
 recordings:
 - {path: ../../examples/sysid_data/osc_sysid_20261002_110636.npz, date: '2026-10-02T11:06:36', tool: lv1_tool}
+- {path: ../../examples/sysid_data/osc_sysid_20261002_142149.npz, date: '2026-10-02T14:21:49', tool: lv1_tool}
+
+sim:
+- physics_dt: 0.001
+  ee_kp: [61.2627, 65.3565, 131.233, 139.429, 135.381, 136.038]
+  ee_kd: [17.1463, 16.6912, 22.2324, 23.4749, 24.414, 24.0656]
+  null_kp: [9.55463, 9.56199, 7.40728, 9.26097, 8.63062, 8.26141, 7.52833]
+  null_kd: [2.04602, 1.05146, 3.81317, 1.58309, 2.46075, 2.28999, 1.59673]
+  mass_matrix: nominal
+  mass_matrix_armature: [0.195, 0.195, 0.195, 0.195, 0.074, 0.074, 0.074]
+  armature: [0.195, 0.195, 0.195, 0.195, 0.074, 0.074, 0.074]
+  damping: [0.182392, 0.579946, 0.304307, 0.170543, 0.242257, 0.289265, 0.379292]
+  frictionloss: [0.726199, 0.827749, 0.647762, 0.919795, 0.559554, 0.425269, 0.517226]
+  payload:
+    mass: 0.1184
+    com: [0.0, 0.0, 0.0795]
+    inertia:
+    - [0.0001184, 0.0, 0.0]
+    - [0.0, 0.0001184, 0.0]
+    - [0.0, 0.0, 0.0001184]
+  fit:
+    data: osc_sysid_20261002_142149.npz
+    date: '2026-10-02T14:51:16'
+    holdout: right
+    plant: robot
+    tool: lv1_tool
+    weights: {joints: 0.8, tcp: 0.2}
+    fixed: [armature]
+    relative_to_mm_mrad: {joints: 11.2993, tcp_position: 5.71923, tcp_rotation: 24.1295}
+    rms_mm_mrad:
+      start:
+        train: {error: 1.0, joints: 11.2993, tcp_position: 5.71923, tcp_rotation: 24.1295}
+        held_out: {error: 0.98918, joints: 10.9757, tcp_position: 6.55957, tcp_rotation: 23.1561}
+      fit:
+        train: {error: 0.33828, joints: 3.41766, tcp_position: 3.2905, tcp_rotation: 6.88552}
+        held_out: {error: 0.376259, joints: 3.78106, tcp_position: 3.77423, tcp_rotation: 7.01066}
+    plots: [../../examples/sysid_data/osc_sysid_20261002_142149_fit_1ms_task.png, ../../examples/sysid_data/osc_sysid_20261002_142149_fit_1ms_joints.png]
+- physics_dt: 0.005
+  ee_kp: [62.4511, 70.6292, 143.208, 145.617, 141.543, 120.029]
+  ee_kd: [17.282, 17.993, 25.3706, 24.212, 25.5205, 19.6372]
+  null_kp: [12.4366, 11.2288, 8.81678, 8.02218, 10.0533, 9.69152, 8.35243]
+  null_kd: [2.80047, 2.33384, 3.04419, 2.95103, 1.42766, 1.82254, 3.06205]
+  mass_matrix: nominal
+  mass_matrix_armature: [0.195, 0.195, 0.195, 0.195, 0.074, 0.074, 0.074]
+  armature: [0.195, 0.195, 0.195, 0.195, 0.074, 0.074, 0.074]
+  damping: [0.198763, 0.154274, 0.147433, 0.28616, 0.223681, 0.267365, 0.172853]
+  frictionloss: [0.922249, 0.958582, 0.96241, 0.951677, 0.59261, 0.470348, 0.479793]
+  payload:
+    mass: 0.1184
+    com: [0.0, 0.0, 0.0795]
+    inertia:
+    - [0.0001184, 0.0, 0.0]
+    - [0.0, 0.0001184, 0.0]
+    - [0.0, 0.0, 0.0001184]
+  fit:
+    data: osc_sysid_20261002_142149.npz
+    date: '2026-10-02T14:58:26'
+    holdout: right
+    plant: robot
+    tool: lv1_tool
+    weights: {joints: 0.8, tcp: 0.2}
+    fixed: [armature]
+    relative_to_mm_mrad: {joints: 11.3246, tcp_position: 5.7192, tcp_rotation: 24.2187}
+    rms_mm_mrad:
+      start:
+        train: {error: 1.0, joints: 11.3246, tcp_position: 5.7192, tcp_rotation: 24.2187}
+        held_out: {error: 0.988591, joints: 11.0049, tcp_position: 6.5186, tcp_rotation: 23.2229}
+      fit:
+        train: {error: 0.333543, joints: 3.34931, tcp_position: 3.29939, tcp_rotation: 6.84726}
+        held_out: {error: 0.367477, joints: 3.77159, tcp_position: 3.56964, tcp_rotation: 6.56568}
+    plots: [../../examples/sysid_data/osc_sysid_20261002_142149_fit_5ms_task.png, ../../examples/sysid_data/osc_sysid_20261002_142149_fit_5ms_joints.png]
