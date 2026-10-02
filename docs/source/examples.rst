@@ -254,6 +254,14 @@ Set end-effector mass and center of mass for accurate gravity compensation:
 
    aiofranka.lock()
 
+If you do not know the parameters, identify the tool with ``aiofranka tool identify gripper``, which
+saves it as an end-effector profile in Desk. Activate a saved profile whenever its tool is mounted
+(see :ref:`payload-identification`):
+
+.. code-block:: python
+
+   aiofranka.load_tool("gripper")
+
 Example 8: Gripper Control
 ---------------------------
 
@@ -347,7 +355,19 @@ IP as an optional argument and runs in MuJoCo without it:
 - ``00_move.py``: Move one joint (``--joint``, ``--delta``)
 - ``01_joint_impedance.py``: Hold the current joint positions with joint impedance control
 - ``02_osc_hold.py``: Hold the current end-effector pose with operational space control
-- ``03_zero_torque.py``: Stream zero torque, so the robot only compensates gravity
+- ``03_zero_torque.py``: Stream zero torque, so the robot only compensates gravity. With a new tool
+  on the flange, the arm should stay still; if it drifts, identify the tool with
+  ``aiofranka tool identify NAME`` (see :ref:`payload-identification`).
+- ``04_collect_joint_sysid.py``: Record steps, multisines and slow ramps with joint impedance at your
+  policy's gains and rate (``--kp``, ``--kd``, ``--hz``) at three poses, about 1.5 minutes
+- ``05_fit_joint_sysid.py``: Fit kp, kd, armature, damping and friction loss of each joint to a
+  recording with CMA-ES, simulating at your physics step (``--traj``, ``--physics_dt``). Needs
+  ``pip install mjbatch``.
+- ``06_collect_osc_sysid.py``: The same with operational space control at your policy's gains
+  (``--ee_kp``, ``--ee_kd``, ``--null_kp``, ``--null_kd``, ``--null_target``), TCP (``--tcp``) and
+  rate (``--hz``), about 2 minutes
+- ``07_fit_osc_sysid.py``: Fit ee_kp, ee_kd, null_kp, null_kd and each joint's armature, damping
+  and friction loss to an OSC recording (``--traj``, ``--physics_dt``)
 
 Research scripts (system identification, SpaceMouse teleoperation, Robotiq gripper) are on the
 `research-scripts <https://github.com/younghyopark/aiofranka/tree/research-scripts>`_ branch.
