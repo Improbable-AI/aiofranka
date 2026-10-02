@@ -2,8 +2,9 @@
 """
 Collect operational space control data to identify the FR3 with 07_fit_osc_sysid.py.
 
-With the OSC gains, null-space gains and target, TCP and policy rate you will use, it
-plays 13 s blocks of TCP pose targets around three base poses, two at each. The targets
+With an OSC configuration (see aiofranka.config: ee_kp, ee_kd, null_kp, null_kd, the
+null-space target, the TCP, the policy rate as frequency, and the tool), it plays 13 s
+blocks of TCP pose targets around three base poses, two at each. The targets
 change at the policy rate and are held in between, as a policy's actions are:
 
     hold 0.5 s | 2 steps, 3 s | 6-DOF multisine 0.17-3 Hz, 6 s | slow ramps, 3 s | hold 0.5 s
@@ -12,12 +13,13 @@ Position offsets are in the base frame, rotation offsets are rotation vectors in
 frame about the TCP. Every 1 kHz control tick goes to one npz,
 examples/sysid_data/osc_sysid_<date>.npz.
 
-    python examples/06_collect_osc_sysid.py 173.16.0.2 --ee_kp 300 300 300 30 30 30 \\
-        --ee_kd 30 30 30 3 3 3 --null_kp 10 --hz 50 --tcp 0 0 0.1034
-    mjpython examples/06_collect_osc_sysid.py --ee_kp ... --ee_kd ... --null_kp 10 --hz 50   # dry run in MuJoCo
+    python examples/06_collect_osc_sysid.py 173.16.0.2 --activate configs/osc.yaml
+    mjpython examples/06_collect_osc_sysid.py --activate configs/osc.yaml   # dry run in MuJoCo
 
-Add --plan to check the plan and exit. Each block starts at its base joint pose with joint
-impedance, switches to the OSC and waits 1 s for the null space to settle toward the null
+Add --plan to check the plan and exit. It refuses to move if the configuration's tool is
+not the end effector active in Desk; 07_fit_osc_sysid.py adds its fit to the same file.
+Each block starts at its base joint pose with joint impedance, applies the configuration
+with controller.activate() and waits 1 s for the null space to settle toward the null
 target, then plays. Before moving, every target is solved with inverse kinematics (biased
 toward the null target, as the OSC's null space is) and checked for 5 cm of clearance
 between the arm, a cylinder around the tool and the floor and for 0.1 rad from the joint
@@ -44,6 +46,7 @@ import mujoco.viewer
 import numpy as np
 
 from aiofranka import FrankaController, RobotInterface
+from aiofranka.config import load_config, to_yaml
 from aiofranka.payload import MODEL_PATH, _closest, _collision_model, _is_clear
 
 CONTROL_HZ = 1000
@@ -327,7 +330,7 @@ async def move_to(controller, target):
         await asyncio.sleep(0.01)
 
 
-async def collect(controller, blocks, poses, gains):
+async def collect(controller, blocks, poses, config):
     started = time.perf_counter()
     for index, block in enumerate(blocks):
         print(f"  [{index + 1}/{len(blocks)}] {block.pose}   ({(time.perf_counter() - started) / 60:.1f} min, "
@@ -337,11 +340,7 @@ async def collect(controller, blocks, poses, gains):
         await asyncio.sleep(SETTLE)
         if controller.abort_reason is not None:
             return
-        controller.switch("osc")  # holds the current TCP pose
-        with controller.state_lock:
-            controller.ee_kp, controller.ee_kd = gains["ee_kp"].copy(), gains["ee_kd"].copy()
-            controller.null_kp, controller.null_kd = gains["null_kp"].copy(), gains["null_kd"].copy()
-            controller.initial_qpos = gains["null_target"].copy()  # the OSC's null-space target
+        controller.activate(config, check_tool=False)  # holds the current TCP pose; tool checked before moving
         await asyncio.sleep(SETTLE)
         if controller.abort_reason is not None:
             return
@@ -441,21 +440,12 @@ def parse_args():
         description=__doc__.split("\n\n")[1].replace("\n", " "),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("ip", nargs="?", help="Robot IP; omit it to run MuJoCo")
-    parser.add_argument("--ee_kp", "--ee-kp", type=float, nargs=6, required=True,
-                        help="TCP stiffness: x, y, z [N/m] and rotation [Nm/rad]")
-    parser.add_argument("--ee_kd", "--ee-kd", type=float, nargs=6, required=True,
-                        help="TCP damping: x, y, z [N s/m] and rotation [Nm s/rad]")
-    parser.add_argument("--null_kp", "--null-kp", type=float, nargs="+", required=True,
-                        help="Null-space stiffness, 7 values or one for all joints")
-    parser.add_argument("--null_kd", "--null-kd", type=float, nargs="+", default=[1.0],
-                        help="Null-space damping, 7 values or one for all joints")
-    parser.add_argument("--null_target", "--null-target", type=float, nargs=7, default=POSES["home"],
-                        help="Null-space target joint positions [rad]")
-    parser.add_argument("--hz", type=int, required=True, help="Policy rate: how often the targets change [Hz]")
-    parser.add_argument("--tcp", type=float, nargs="+", default=[0.0, 0.0, 0.0],
-                        help="TCP in the flange frame: a translation (3 values) [m] or a 4x4 transform "
-                             "(16 values, row by row)")
+    parser.add_argument("--activate", type=Path, required=True,
+                        help="OSC configuration (YAML, see aiofranka.config)")
     parser.add_argument("--plan", action="store_true", help="Check the plan and exit")
+    parser.add_argument("--no-check-tool", action="store_true",
+                        help="Collect even if Desk's active end effector is not the configuration's tool "
+                             "or cannot be read")
     parser.add_argument("--poses", nargs="+", default=list(POSES), choices=list(POSES), help="Base poses")
     parser.add_argument("--repeats", type=int, default=2, help="Blocks at each pose")
     parser.add_argument("--seed", type=int, default=0, help="Seed of the step offsets")
@@ -472,25 +462,19 @@ def parse_args():
     parser.add_argument("--headless", action="store_true", help="In MuJoCo, run without the viewer")
     parser.add_argument("-y", "--yes", action="store_true", help="Do not ask before moving")
     args = parser.parse_args()
-    if args.hz <= 0 or CONTROL_HZ % args.hz:
-        parser.error(f"--hz must divide {CONTROL_HZ} Hz, not {args.hz}")
-    for name in ("null_kp", "null_kd"):
-        values = getattr(args, name)
-        if len(values) not in (1, 7):
-            parser.error(f"--{name} takes 1 or 7 values")
-        setattr(args, name, np.broadcast_to(np.array(values), (7,)).copy())
-    tcp = np.array(args.tcp)
-    if tcp.shape == (3,):
-        tcp = np.block([[np.eye(3), tcp[:, None]], [np.zeros(3), 1.0]])
-    elif tcp.shape == (16,):
-        tcp = tcp.reshape(4, 4)
-    else:
-        parser.error("--tcp takes 3 or 16 values")
-    if (not np.allclose(tcp[3], [0, 0, 0, 1]) or not np.allclose(tcp[:3, :3] @ tcp[:3, :3].T, np.eye(3), atol=1e-6)
-            or np.linalg.det(tcp[:3, :3]) < 0):
-        parser.error("--tcp must be a translation or a 4x4 pose with a rotation")
-    args.tcp = tcp
-    args.ee_kp, args.ee_kd, args.null_target = np.array(args.ee_kp), np.array(args.ee_kd), np.array(args.null_target)
+    try:
+        config = load_config(args.activate)
+    except (OSError, ValueError) as error:
+        parser.error(f"--activate {args.activate}: {error}")
+    if config["mode"] != "osc":
+        parser.error(f"--activate needs mode osc, not {config['mode']}; use 04_collect_joint_sysid.py")
+    args.config, args.hz = config, round(config["frequency"])
+    if args.hz != config["frequency"] or CONTROL_HZ % args.hz:
+        parser.error(f"The frequency must divide {CONTROL_HZ} Hz, not {config['frequency']}")
+    if np.any(config["ee_kp"] <= 0):
+        parser.error("ee_kp must be positive")
+    for name in ("ee_kp", "ee_kd", "null_kp", "null_kd", "null_target", "tcp"):
+        setattr(args, name, config[name])
     return args
 
 
@@ -507,7 +491,8 @@ async def main() -> int:
     moves = len(blocks) * (2 * SETTLE + 1.0) + sum(
         max(1.875 * np.abs(poses[a] - poses[b]).max() / MOVE_SPEED, 0.5)
         for a, b in zip(list(poses), list(poses)[1:] + list(poses)[:1]) if a != b)
-    print(f"\n  ee_kp {args.ee_kp.tolist()}, ee_kd {args.ee_kd.tolist()}")
+    print(f"\n  {args.activate}: ee_kp {args.ee_kp.tolist()}, ee_kd {args.ee_kd.tolist()}, "
+          f"tool {args.config.get('tool', 'not set')}")
     print(f"  null_kp {args.null_kp.tolist()}, null_kd {args.null_kd.tolist()}, "
           f"null target {args.null_target.tolist()}")
     print(f"  TCP translation {args.tcp[:3, 3].tolist()} m, targets at {args.hz} Hz")
@@ -541,6 +526,12 @@ async def main() -> int:
           f"{np.round(load['payload']['com'], 4).tolist()} m")
 
     controller = Collector(robot)
+    if not args.no_check_tool:
+        try:
+            controller.check_tool(args.config)
+        except RuntimeError as error:
+            print(f"\n  {error} Here: --no-check-tool.\n")
+            return 1
     controller.setup(total)
     controller.set_tcp(args.tcp)
     stamp = datetime.datetime.now()
@@ -555,11 +546,15 @@ async def main() -> int:
         "torque_limit": controller.torque_limit.tolist(),
         "torque_rate_limit": controller.torque_diff_limit,
         "segments": SEGMENTS,
+        "config": to_yaml(args.config),
+        "config_path": str(args.activate.resolve()),
+        "tool": robot.tool.name if robot.tool is not None else None,
+        "tool_checked": not args.no_check_tool and robot.real,
         "hz": args.hz,
         "pose_names": list(poses),
         "load": load,
         "settings": {k: (str(v) if isinstance(v, Path) else v.tolist() if isinstance(v, np.ndarray) else v)
-                     for k, v in vars(args).items()},
+                     for k, v in vars(args).items() if k != "config"},
         **provenance(),
     }
     controller.error_callback = lambda error: save(path, controller, blocks, poses, gains, args.hz,
@@ -572,7 +567,7 @@ async def main() -> int:
     await controller.start()
     status = 0
     try:
-        await collect(controller, blocks, poses, gains)
+        await collect(controller, blocks, poses, args.config)
     except asyncio.CancelledError:
         controller._abort("interrupted")
         await asyncio.sleep(0.5)

@@ -358,16 +358,16 @@ IP as an optional argument and runs in MuJoCo without it:
 - ``03_zero_torque.py``: Stream zero torque, so the robot only compensates gravity. With a new tool
   on the flange, the arm should stay still; if it drifts, identify the tool with
   ``aiofranka tool identify NAME`` (see :ref:`payload-identification`).
-- ``04_collect_joint_sysid.py``: Record steps, multisines and slow ramps with joint impedance at your
-  policy's gains and rate (``--kp``, ``--kd``, ``--hz``) at three poses, about 1.5 minutes
+- ``04_collect_joint_sysid.py``: Record steps, multisines and slow ramps with joint impedance at three
+  poses, about 1.5 minutes, with a controller configuration (``--activate configs/joint_impedance.yaml``,
+  see :ref:`controller-configurations`)
 - ``05_fit_joint_sysid.py``: Fit kp, kd, armature, damping and friction loss of each joint to a
-  recording with CMA-ES, simulating at your physics step (``--traj``, ``--physics_dt``). Needs
-  ``pip install mjbatch``.
-- ``06_collect_osc_sysid.py``: The same with operational space control at your policy's gains
-  (``--ee_kp``, ``--ee_kd``, ``--null_kp``, ``--null_kd``, ``--null_target``), TCP (``--tcp``) and
-  rate (``--hz``), about 2 minutes
+  recording with CMA-ES, simulating at your physics step (``--traj``, ``--physics_dt``), and add the
+  fit to the configuration's ``sim`` section. Needs ``pip install mjbatch``.
+- ``06_collect_osc_sysid.py``: The same with operational space control
+  (``--activate configs/osc.yaml``), about 2 minutes
 - ``07_fit_osc_sysid.py``: Fit ee_kp, ee_kd, null_kp, null_kd and each joint's armature, damping
-  and friction loss to an OSC recording (``--traj``, ``--physics_dt``)
+  and friction loss to an OSC recording, weighing the TCP response and the joints
 
 Research scripts (system identification, SpaceMouse teleoperation, Robotiq gripper) are on the
 `research-scripts <https://github.com/younghyopark/aiofranka/tree/research-scripts>`_ branch.

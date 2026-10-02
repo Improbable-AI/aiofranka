@@ -1,0 +1,6 @@
+# Joint impedance, as a policy runs it. Apply with controller.activate("configs/joint_impedance.yaml").
+mode: impedance
+tool: none                       # Desk end-effector profile; none is "No End Effector"
+kp: [64, 64, 64, 64, 32, 32, 32] # [Nm/rad]: one value, or one per joint
+kd: [16, 16, 16, 16, 8, 8, 8]    # [Nm s/rad]
+frequency: 50                    # policy rate [Hz]

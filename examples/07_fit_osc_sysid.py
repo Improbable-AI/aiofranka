@@ -26,13 +26,14 @@ held out to check the fit.
     pip install mjbatch   # batched MuJoCo; it pins its own mujoco version
     python examples/07_fit_osc_sysid.py --traj examples/sysid_data/osc_sysid_<date>.npz --physics_dt 0.002
 
-Writes osc_sysid_<date>_fit_<physics_dt>.json next to the recording.
+Adds the fit to the sim section of the configuration the recording was collected with
+(or --activate), as the entry for this physics_dt (see aiofranka.config).
 """
 
 from __future__ import annotations
 
 import argparse
-import importlib.util
+import datetime
 import json
 import math
 import time
@@ -42,9 +43,11 @@ import mujoco
 import numpy as np
 from mjbatch import Batch
 
+from aiofranka.config import load_config, same_controller, save_sim
+from aiofranka.payload import MODEL_PATH
+from aiofranka.robot import link_inertial, merge_payload
+
 CONTROL_HZ = 1000
-# aiofranka's model; found without importing aiofranka, which needs pylibfranka.
-MODEL_PATH = Path(importlib.util.find_spec("aiofranka").origin).parent / "model" / "fr3.xml"
 GAINS = ("ee_kp", "ee_kd", "null_kp", "null_kd")
 PHYSICAL = ("armature", "damping", "frictionloss")
 SIZES = {"ee_kp": 6, "ee_kd": 6, "null_kp": 7, "null_kd": 7, "armature": 7, "damping": 7, "frictionloss": 7}
@@ -93,23 +96,17 @@ class Run:
 
 
 def build_model(run, physics_dt):
-    """fr3.xml with the payload the robot compensated, in free space."""
-    spec = mujoco.MjSpec.from_file(str(MODEL_PATH))
-    for key in list(spec.keys):
-        spec.delete(key)
-    mass = run.payload["mass"]
-    if mass > 0:
-        site = spec.site("attachment_site")
-        body = site.parent.add_body(name="payload", pos=list(site.pos), quat=list(site.quat))
-        body.gravcomp = 1.0  # the robot compensates its gravity, as fr3.xml does the arm's
-        body.explicitinertial = True
-        body.mass = mass
-        body.ipos = list(run.payload["com"])
-        inertia = np.array(run.payload["inertia"])
-        body.fullinertia = [inertia[0, 0], inertia[1, 1], inertia[2, 2], inertia[0, 1], inertia[0, 2], inertia[1, 2]]
-    spec.option.timestep = physics_dt
-    spec.option.disableflags |= mujoco.mjtDisableBit.mjDSBL_CONTACT
-    return spec.compile()
+    """
+    fr3.xml in free space, with the payload the robot compensated merged into its last
+    link as RobotInterface.sync_payload() merges it into the model of aiofranka's controllers.
+    """
+    model = mujoco.MjModel.from_xml_path(str(MODEL_PATH))
+    model.opt.timestep = physics_dt
+    model.opt.disableflags |= int(mujoco.mjtDisableBit.mjDSBL_CONTACT)
+    payload = run.payload
+    merge_payload(model, link_inertial(model), payload["mass"], payload["com"], payload["inertia"])
+    mujoco.mj_setConst(model, mujoco.MjData(model))
+    return model
 
 
 def rotvec(matrix):
@@ -378,10 +375,36 @@ def evaluate(sim, params, starts, length, weights):
     return {"error": float(cost(error, weights)[0]), **{key: float(value[0]) for key, value in error.items()}}
 
 
+def configuration(run, path):
+    """
+    The configuration file to add the fit to, path or the recording's, if it describes the
+    recorded controller; and the recorded controller.
+    """
+    if path is None:
+        if run.meta.get("sim"):
+            raise ValueError("The recording comes from MuJoCo: pass --activate to say which configuration "
+                             "its fit goes to")
+        if not run.meta.get("config_path"):
+            raise ValueError("The recording does not name its configuration; pass --activate")
+        path = run.meta["config_path"]
+        if not Path(path).exists():
+            raise ValueError(f"The recording's configuration {path} is not there; pass --activate")
+    path = Path(path)
+    config = load_config(path)
+    recorded = run.meta.get("config") or {
+        "mode": "osc", "frequency": run.hz, "null_target": run.null_target.tolist(), "tcp": run.tcp.tolist(),
+        "tool": config.get("tool"), **{name: run.gains[name].tolist() for name in GAINS}}
+    if not same_controller(config, recorded):
+        raise ValueError(f"{path} no longer describes the controller of the recording")
+    return path, recorded
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[1].replace("\n", " "),
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--traj", type=Path, required=True, help="Recording of 06_collect_osc_sysid.py")
+    parser.add_argument("--activate", type=Path,
+                        help="Configuration to add the fit to (default: the one the recording was collected with)")
     parser.add_argument("--physics_dt", "--physics-dt", type=float, required=True,
                         help="Physics step of your simulation [s], a whole number of ms dividing the policy period")
     parser.add_argument("--mass_matrix", "--mass-matrix", choices=("nominal", "plant"), default="nominal",
@@ -398,10 +421,13 @@ def main():
     parser.add_argument("--sigma", type=float, default=0.3, help="Initial step size, in log of the parameters")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--threads", type=int, default=0, help="Simulation threads (0: all CPUs)")
-    parser.add_argument("--out", type=Path, help="Output JSON (default: next to the recording)")
     args = parser.parse_args()
 
-    run = Run(args.traj)
+    try:
+        run = Run(args.traj)
+        config_path, recorded_controller = configuration(run, args.activate)
+    except (OSError, ValueError) as problem:
+        parser.error(str(problem))
     sim = Simulator(run, args.physics_dt, args.mass_matrix, threads=args.threads)
     recorded = sorted({run.pose_names[run.pose[b]] for b in np.unique(run.block)}, key=run.pose_names.index)
     holdout = recorded[-1] if args.holdout == "last" and len(recorded) > 1 else args.holdout
@@ -411,8 +437,9 @@ def main():
     train = run.windows(length, [p for p in recorded if p != holdout])
     test = run.windows(length, [holdout])
 
-    print(f"\n  {args.traj.name}: {run.hz} Hz, TCP translation {run.tcp[:3, 3].tolist()} m, "
-          f"payload {run.payload['mass']:.3f} kg")
+    print(f"\n  {args.traj.name}: {run.hz} Hz, TCP translation {run.tcp[:3, 3].tolist()} m")
+    print(f"  Tool {run.meta.get('tool') or '(not read from Desk)'}: the model, and the OSC's mass matrix, carry the payload the robot "
+          f"compensated, {run.payload['mass']:.3f} kg at {np.round(run.payload['com'], 4).tolist()} m")
     print("  " + ", ".join(f"{name} {run.gains[name].tolist()}" for name in GAINS))
     print(f"  null target {run.null_target.tolist()}")
     print(f"  Replay check: max |recomputed - sent torque| = {sim.replay_error():.1e} Nm")
@@ -440,37 +467,27 @@ def main():
         print(f"  {j + 1}      " + "  ".join(f"{base[n][j]:6.3g} -> {params[n][j]:<6.3g}"
                                           for n in ("null_kp", "null_kd") + PHYSICAL))
 
-    out = args.out or args.traj.with_name(f"{args.traj.stem}_fit_{args.physics_dt * 1000:g}ms.json")
-    joint_xml = [f'<joint name="fr3_joint{j + 1}" armature="{params["armature"][j]:.5g}" '
-                 f'damping="{params["damping"][j]:.5g}" frictionloss="{params["frictionloss"][j]:.5g}"/>'
-                 for j in range(7)]
-    report = {
-        "data": str(args.traj),
+    scale = {"error": 1000, "tcp_position": 1000, "tcp_rotation": 1000, "joints": 1000}
+    save_sim(config_path, {
         "physics_dt": args.physics_dt,
-        "policy_hz": run.hz,
-        "decimation": sim.decimation,
-        "controller": {
-            "law": "aiofranka OSC every physics step, rate limited and clipped, on <motor> actuators",
-            **{name: params[name].tolist() for name in GAINS},
-            "null_target": run.null_target.tolist(),
-            "tcp": run.tcp.tolist(),
-            "mass_matrix": args.mass_matrix,
-            "mass_matrix_armature": (sim.nominal_armature if args.mass_matrix == "nominal"
-                                     else params["armature"]).tolist(),
-            "torque_rate_limit": run.rate_limit,
-            "torque_limit": run.torque_limit.tolist(),
+        **{name: params[name] for name in GAINS},
+        "mass_matrix": args.mass_matrix,  # armature in the OSC's mass matrix: fr3.xml's (nominal) or the fitted
+        "mass_matrix_armature": sim.nominal_armature if args.mass_matrix == "nominal" else params["armature"],
+        **{name: params[name] for name in PHYSICAL},
+        # The payload the fit assumed, merged into fr3_link7 as aiofranka.robot.merge_payload() does.
+        "payload": {"mass": run.payload["mass"], "com": run.payload["com"], "inertia": run.payload["inertia"]},
+        "fit": {
+            "data": args.traj.name,
+            "date": datetime.datetime.now().isoformat(timespec="seconds"),
+            "holdout": holdout,
+            "plant": "mujoco" if run.meta.get("sim") else "robot",
+            "tool": run.meta.get("tool"),
+            "weights": weights,
+            "rms_mm_mrad": {label: {split: {key: scale[key] * value for key, value in e.items()}
+                                    for split, e in result.items()} for label, result in results.items()},
         },
-        "joints": {n: params[n].tolist() for n in PHYSICAL},
-        "mjcf": [f'<option timestep="{args.physics_dt:g}" integrator="implicitfast"/>'] + joint_xml,
-        "start": {n: base[n].tolist() for n in SIZES},
-        "rms": results,
-        "rms_units": {"error": "m", "tcp_position": "m", "tcp_rotation": "rad", "joints": "rad"},
-        "weights": weights,
-        "holdout": holdout,
-        "settings": {k: (str(v) if isinstance(v, Path) else v) for k, v in vars(args).items()},
-    }
-    out.write_text(json.dumps(report, indent=1))
-    print(f"\n  Saved {out}\n")
+    }, controller=recorded_controller)
+    print(f"\n  Added the fit for physics_dt {args.physics_dt:g} to {config_path}\n")
 
 
 if __name__ == "__main__":

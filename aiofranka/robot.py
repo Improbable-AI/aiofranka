@@ -66,6 +66,72 @@ def require_pylibfranka():
     return pylibfranka
 
 
+def merge_payload(model, link_inertial, mass, com, inertia, site_id=None):
+    """
+    Merge a payload on the flange into the last link of a MuJoCo FR3 model.
+
+    Sets fr3_link7's mass, center of mass and inertia to those of the link and the
+    payload together (parallel axis theorem), as RobotInterface.sync_payload() does for
+    the model aiofranka's controllers use. Call mj_setConst() afterwards.
+
+    Args:
+        model (mujoco.MjModel): Model to change
+        link_inertial (tuple): fr3_link7's own mass, ipos, iquat and inertia, as in the
+            unmodified model
+        mass (float): Payload mass [kg]
+        com (array-like): Payload center of mass in the flange frame [m] (3,)
+        inertia (array-like): Payload inertia about its center of mass in the flange
+            frame [kg m^2] (3, 3)
+        site_id (int | None): The flange site (default: attachment_site)
+    """
+    def rotation(quat):
+        mat = np.zeros(9)
+        mujoco.mju_quat2Mat(mat, quat)
+        return mat.reshape(3, 3)
+
+    if site_id is None:
+        site_id = model.site("attachment_site").id
+    com, inertia = np.asarray(com, dtype=float), np.asarray(inertia, dtype=float)
+    body = model.body("fr3_link7").id
+    link_mass, link_com, link_iquat, link_inertia = link_inertial
+    rot = rotation(link_iquat)
+    link_tensor = rot @ np.diag(link_inertia) @ rot.T
+
+    # Payload in the link frame, from the attachment_site placement.
+    rot = rotation(model.site_quat[site_id])
+    load_com = model.site_pos[site_id] + rot @ com
+    load_tensor = rot @ inertia @ rot.T
+
+    # Combine both about their joint center of mass (parallel axis theorem).
+    total = link_mass + mass
+    total_com = (link_mass * link_com + mass * load_com) / total
+
+    def parallel_axis(m, offset):
+        return m * (offset @ offset * np.eye(3) - np.outer(offset, offset))
+
+    tensor = (
+        link_tensor + parallel_axis(link_mass, link_com - total_com)
+        + load_tensor + parallel_axis(mass, load_com - total_com)
+    )
+    principal, axes = np.linalg.eigh(tensor)
+    if np.linalg.det(axes) < 0:
+        axes[:, 0] *= -1
+    quat = np.zeros(4)
+    mujoco.mju_mat2Quat(quat, axes.flatten())
+
+    model.body_mass[body] = total
+    model.body_ipos[body] = total_com
+    model.body_iquat[body] = quat
+    model.body_inertia[body] = principal
+
+
+def link_inertial(model):
+    """fr3_link7's mass, ipos, iquat and inertia, for merge_payload()."""
+    body = model.body("fr3_link7").id
+    return (float(model.body_mass[body]), model.body_ipos[body].copy(),
+            model.body_iquat[body].copy(), model.body_inertia[body].copy())
+
+
 class RobotInterface: 
     """
     High-level interface for Franka FR3 robot control.
@@ -104,13 +170,17 @@ class RobotInterface:
         - MuJoCo model must match real robot configuration
     """
 
-    def __init__(self, ip = None): 
+    def __init__(self, ip = None, read_tool = True):
         """
         Initialize robot interface.
         
         Args:
             ip (str | None): Robot IP address (e.g., "172.16.0.2") for real robot,
                            or None for simulation mode.
+            read_tool (bool): Read the end-effector profile active in Desk (robot.tool),
+                           which FrankaController.activate() checks configurations
+                           against, with the Desk credentials saved by aiofranka; it
+                           waits up to 3 s for Desk and never takes the control token
                            
         Raises:
             ModuleNotFoundError: If pylibfranka is not installed (real robot mode)
@@ -131,6 +201,11 @@ class RobotInterface:
         self.torque_controller = None
         # Last pylibfranka.RobotState read from the robot (None in simulation).
         self.robot_state = None
+        # End-effector profile active in Desk when connecting (an aiofranka.Tool), which
+        # FrankaController.activate() checks configurations against, or None if Desk
+        # could not be read (tool_error says why) or in simulation.
+        self.tool = None
+        self.tool_error = "MuJoCo has no Desk" if ip is None else "RobotInterface(read_tool=False) did not read Desk"
 
         # End-effector site we wish to control.
         self.site_name = "attachment_site"
@@ -141,13 +216,7 @@ class RobotInterface:
         # link without it.
         self.load = {"mass": 0.0, "com": np.zeros(3), "inertia": np.zeros((3, 3))}
         self.payload = {"mass": 0.0, "com": np.zeros(3), "inertia": np.zeros((3, 3))}
-        last_link = self.model.body("fr3_link7").id
-        self._last_link_inertial = (
-            float(self.model.body_mass[last_link]),
-            self.model.body_ipos[last_link].copy(),
-            self.model.body_iquat[last_link].copy(),
-            self.model.body_inertia[last_link].copy(),
-        )
+        self._last_link_inertial = link_inertial(self.model)
 
         # The first calls of these take a few hundred microseconds, which would miss
         # the first control cycles. Make them once before the 1 kHz loop starts.
@@ -174,6 +243,13 @@ class RobotInterface:
             self.sync_mj()
             self.sync_payload()
 
+            # Read Desk now: during control, an HTTP request would stall the 1 kHz loop.
+            if read_tool:
+                try:
+                    from aiofranka.tools import active_tool
+                    self.tool = active_tool(ip, timeout=3.0)
+                except Exception as error:
+                    self.tool_error = f"could not read Desk's active end-effector profile: {error}"
 
         else: 
             self.viewer = mujoco.viewer.launch_passive(self.model, self.data)
@@ -280,42 +356,7 @@ class RobotInterface:
         else:
             mass, com, inertia = self.load["mass"], self.load["com"], self.load["inertia"]
 
-        def rotation(quat):
-            mat = np.zeros(9)
-            mujoco.mju_quat2Mat(mat, quat)
-            return mat.reshape(3, 3)
-
-        body = self.model.body("fr3_link7").id
-        link_mass, link_com, link_iquat, link_inertia = self._last_link_inertial
-        rot = rotation(link_iquat)
-        link_tensor = rot @ np.diag(link_inertia) @ rot.T
-
-        # Payload in the link frame, from the attachment_site placement.
-        rot = rotation(self.model.site_quat[self.site_id])
-        load_com = self.model.site_pos[self.site_id] + rot @ com
-        load_tensor = rot @ inertia @ rot.T
-
-        # Combine both about their joint center of mass (parallel axis theorem).
-        total = link_mass + mass
-        total_com = (link_mass * link_com + mass * load_com) / total
-
-        def parallel_axis(m, offset):
-            return m * (offset @ offset * np.eye(3) - np.outer(offset, offset))
-
-        tensor = (
-            link_tensor + parallel_axis(link_mass, link_com - total_com)
-            + load_tensor + parallel_axis(mass, load_com - total_com)
-        )
-        principal, axes = np.linalg.eigh(tensor)
-        if np.linalg.det(axes) < 0:
-            axes[:, 0] *= -1
-        quat = np.zeros(4)
-        mujoco.mju_mat2Quat(quat, axes.flatten())
-
-        self.model.body_mass[body] = total
-        self.model.body_ipos[body] = total_com
-        self.model.body_iquat[body] = quat
-        self.model.body_inertia[body] = principal
+        merge_payload(self.model, self._last_link_inertial, mass, com, inertia, self.site_id)
 
         # mj_setConst resets the state to qpos0, so keep the current one.
         qpos, qvel = self.data.qpos.copy(), self.data.qvel.copy()

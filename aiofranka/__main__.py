@@ -1105,7 +1105,7 @@ async def _identify_tool(robot_ip: str, kwargs: dict):
     from aiofranka.controller import FrankaController
     from aiofranka.robot import RobotInterface
 
-    controller = FrankaController(RobotInterface(robot_ip))
+    controller = FrankaController(RobotInterface(robot_ip, read_tool=False))
     # Joint impedance gains as for moving home.
     gains = np.array([1, 1, 1, 1, 0.6, 0.6, 0.6])
     controller.kp, controller.kd = gains * 80, gains * 4
@@ -1898,7 +1898,7 @@ def _run_all_combos(args):
             pass
         raise
 
-    robot = RobotInterface(robot_ip)
+    robot = RobotInterface(robot_ip, read_tool=False)
     robot.start()
 
     # Use last P-core (i9-14900K: cores 0-15 are P-cores, 16-31 are E-cores)
@@ -2093,7 +2093,7 @@ def cmd_rt_benchmark(args):
     # --- Run benchmark ---
     print(f"\n  {YELLOW}Running benchmark...{RST}\n")
 
-    robot = RobotInterface(robot_ip)
+    robot = RobotInterface(robot_ip, read_tool=False)
     robot.start()
 
     PHASES = ["readOnce", "mj_fwd", "state_build", "ctrl_law", "shm_write"]

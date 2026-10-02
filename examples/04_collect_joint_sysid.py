@@ -2,18 +2,21 @@
 """
 Collect joint impedance data to identify the FR3 with 05_fit_joint_sysid.py.
 
-With the joint impedance gains and the policy rate you will use, it plays 13 s blocks of
-joint targets around three base poses, two at each. The targets change at the policy
+With a joint impedance configuration (see aiofranka.config: kp, kd, the policy rate as
+frequency, and the tool), it plays 13 s blocks of joint targets around three base poses,
+two at each. The targets change at the policy
 rate and are held in between, as a policy's actions are:
 
     hold 0.5 s | 2 steps, 3 s | multisine 0.17-3 Hz, 6 s | slow ramps, 3 s | hold 0.5 s
 
 Every 1 kHz control tick goes to one npz, examples/sysid_data/joint_sysid_<date>.npz.
 
-    python examples/04_collect_joint_sysid.py 173.16.0.2 --kp 64 64 64 64 32 32 32 --kd 16 16 16 16 8 8 8 --hz 50
-    mjpython examples/04_collect_joint_sysid.py --kp ... --kd ... --hz 50   # dry run in MuJoCo
+    python examples/04_collect_joint_sysid.py 173.16.0.2 --activate configs/joint_impedance.yaml
+    mjpython examples/04_collect_joint_sysid.py --activate configs/joint_impedance.yaml   # MuJoCo
 
-Add --plan to check the plan and exit. The robot compensates gravity, including the end
+Add --plan to check the plan and exit. It refuses to move if the configuration's tool is
+not the end effector active in Desk, and applies the configuration with
+controller.activate() for every block; 05_fit_joint_sysid.py adds its fit to the same file. The robot compensates gravity, including the end
 effector active in Desk, and the torques stay inside aiofranka's 990 Nm/s rate limit and
 torque limits. Before moving, every target and every move between poses is checked for
 5 cm of clearance between the arm, a cylinder around the tool and the floor, and every
@@ -40,6 +43,7 @@ import mujoco.viewer
 import numpy as np
 
 from aiofranka import FrankaController, RobotInterface
+from aiofranka.config import load_config, to_yaml
 from aiofranka.payload import MODEL_PATH, _closest, _collision_model, _is_clear
 
 CONTROL_HZ = 1000
@@ -263,7 +267,7 @@ def set_gains(controller, kp, kd):
         controller.kd = np.broadcast_to(np.asarray(kd, float), (7,)).copy()
 
 
-async def collect(controller, blocks, poses):
+async def collect(controller, blocks, poses, config):
     started = time.perf_counter()
     pose = None
     for index, block in enumerate(blocks):
@@ -278,7 +282,7 @@ async def collect(controller, blocks, poses):
         left = sum(len(b.targets) for b in blocks[index:]) / CONTROL_HZ
         print(f"  [{index + 1}/{len(blocks)}] {block.pose}   ({(time.perf_counter() - started) / 60:.1f} min, "
               f"{left / 60:.1f} min of blocks left)")
-        set_gains(controller, block.kp, block.kd)
+        controller.activate(config, check_tool=False)  # checked before moving
         controller.play(index, block)
         while controller.playing:
             await asyncio.sleep(0.05)
@@ -381,10 +385,12 @@ def parse_args():
         description=__doc__.split("\n\n")[1].replace("\n", " "),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("ip", nargs="?", help="Robot IP; omit it to run MuJoCo")
-    parser.add_argument("--kp", type=float, nargs=7, required=True, help="Joint stiffness [Nm/rad]")
-    parser.add_argument("--kd", type=float, nargs=7, required=True, help="Joint damping [Nm s/rad]")
-    parser.add_argument("--hz", type=int, required=True, help="Policy rate: how often the targets change [Hz]")
+    parser.add_argument("--activate", type=Path, required=True,
+                        help="Joint impedance configuration (YAML, see aiofranka.config)")
     parser.add_argument("--plan", action="store_true", help="Check the plan and exit")
+    parser.add_argument("--no-check-tool", action="store_true",
+                        help="Collect even if Desk's active end effector is not the configuration's tool "
+                             "or cannot be read")
     parser.add_argument("--poses", nargs="+", default=list(POSES), choices=list(POSES), help="Base poses")
     parser.add_argument("--repeats", type=int, default=2, help="Blocks at each pose")
     parser.add_argument("--seed", type=int, default=0, help="Seed of the step offsets")
@@ -401,11 +407,17 @@ def parse_args():
     parser.add_argument("--headless", action="store_true", help="In MuJoCo, run without the viewer")
     parser.add_argument("-y", "--yes", action="store_true", help="Do not ask before moving")
     args = parser.parse_args()
-    if args.hz <= 0 or CONTROL_HZ % args.hz:
-        parser.error(f"--hz must divide {CONTROL_HZ} Hz, not {args.hz}")
-    args.kp, args.kd = np.array(args.kp), np.array(args.kd)
-    if np.any(args.kp <= 0) or np.any(args.kd < 0):
-        parser.error("--kp must be positive and --kd non-negative")
+    try:
+        args.config = load_config(args.activate)
+    except (OSError, ValueError) as error:
+        parser.error(f"--activate {args.activate}: {error}")
+    if args.config["mode"] != "impedance":
+        parser.error(f"--activate needs mode impedance, not {args.config['mode']}; use 06_collect_osc_sysid.py")
+    args.kp, args.kd, args.hz = args.config["kp"], args.config["kd"], round(args.config["frequency"])
+    if args.hz != args.config["frequency"] or CONTROL_HZ % args.hz:
+        parser.error(f"The frequency must divide {CONTROL_HZ} Hz, not {args.config['frequency']}")
+    if np.any(args.kp <= 0):
+        parser.error("kp must be positive")
     return args
 
 
@@ -419,7 +431,8 @@ async def main() -> int:
     total = sum(len(b.targets) for b in blocks)
     moves = sum(max(1.875 * np.abs(poses[a] - poses[b]).max() / MOVE_SPEED, 0.5) + SETTLE
                 for a, b in zip(list(poses), list(poses)[1:] + list(poses)[:1]) if a != b)
-    print(f"\n  kp {args.kp.tolist()}, kd {args.kd.tolist()}, targets at {args.hz} Hz")
+    print(f"\n  {args.activate}: kp {args.kp.tolist()}, kd {args.kd.tolist()}, targets at {args.hz} Hz, "
+          f"tool {args.config.get('tool', 'not set')}")
     print(f"  {len(blocks)} blocks, {args.repeats} at each of {', '.join(poses)}: about "
           f"{(total / CONTROL_HZ + moves) / 60:.1f} min, {total * 380 / 1e6:.0f} MB")
     size = np.minimum(STEP_MAX, STEP_TORQUE * TORQUE_LIMIT / args.kp)
@@ -452,6 +465,12 @@ async def main() -> int:
           f"{np.round(load['payload']['com'], 4).tolist()} m")
 
     controller = Collector(robot)
+    if not args.no_check_tool:
+        try:
+            controller.check_tool(args.config)
+        except RuntimeError as error:
+            print(f"\n  {error} Here: --no-check-tool.\n")
+            return 1
     controller.setup(total)
     stamp = datetime.datetime.now()
     path = args.out / f"joint_sysid_{stamp:%Y%m%d_%H%M%S}{'' if robot.real else '_sim'}.npz"
@@ -465,13 +484,15 @@ async def main() -> int:
         "torque_limit": controller.torque_limit.tolist(),
         "torque_rate_limit": controller.torque_diff_limit,
         "segments": SEGMENTS,
-        "kp": args.kp.tolist(),
-        "kd": args.kd.tolist(),
+        "config": to_yaml(args.config),
+        "config_path": str(args.activate.resolve()),
+        "tool": robot.tool.name if robot.tool is not None else None,
+        "tool_checked": not args.no_check_tool and robot.real,
         "hz": args.hz,
         "pose_names": list(poses),
         "load": load,
         "settings": {k: (str(v) if isinstance(v, Path) else v.tolist() if isinstance(v, np.ndarray) else v)
-                     for k, v in vars(args).items()},
+                     for k, v in vars(args).items() if k != "config"},
         **provenance(),
     }
     controller.error_callback = lambda error: save(path, controller, blocks, poses, dict(meta, loop_error=error))
@@ -483,7 +504,7 @@ async def main() -> int:
     await controller.start()
     status = 0
     try:
-        await collect(controller, blocks, poses)
+        await collect(controller, blocks, poses, args.config)
     except asyncio.CancelledError:
         controller._abort("interrupted")
         await asyncio.sleep(0.5)

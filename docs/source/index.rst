@@ -43,6 +43,7 @@ Contents
    api/controller
    api/robot
    api/payload
+   api/config
    api/server
    api/gripper
    api/utilities

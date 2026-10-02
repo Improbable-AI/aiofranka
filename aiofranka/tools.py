@@ -121,11 +121,15 @@ def _check(tool):
 class _Desk:
     """Session with the admin API of the Desk web UI."""
 
-    def __init__(self, ip=None, username=None, password=None, protocol="https"):
+    def __init__(self, ip=None, username=None, password=None, protocol="https", timeout=None):
         from aiofranka.server import _DeskClient, _DeskClientV2, _resolve_from_config
 
         self.ip, username, password = _resolve_from_config(ip, username, password)
         self._admin = _DeskClient(self.ip, username, password, protocol=protocol)
+        if timeout is not None:
+            # Every request of this session, the login included, gives up after timeout seconds.
+            request = self._admin._req
+            self._admin._req = lambda method, path, **kwargs: request(method, path, **{"timeout": timeout, **kwargs})
         self._admin.login()
         self._spoc = _DeskClientV2(self.ip, username, password, protocol=protocol)
         self._took_token = False
@@ -150,10 +154,10 @@ class _Desk:
                 self._took_token = True
         return self._spoc._token
 
-    def request(self, method, path, **kwargs):
-        """Request /admin/api{path}, with the control token if Desk wants one."""
+    def request(self, method, path, token=True, **kwargs):
+        """Request /admin/api{path}, with the control token if Desk wants one and token is True."""
         r = self._admin._req(method, f"/admin/api{path}", **kwargs)
-        if r.status_code == 423 or (r.status_code == 400 and "token" in r.text.lower()):
+        if token and (r.status_code == 423 or (r.status_code == 400 and "token" in r.text.lower())):
             r = self._admin._req(method, f"/admin/api{path}",
                                  headers={"X-Control-Token": self._token()}, **kwargs)
         if r.status_code not in (200, 201, 204):
@@ -188,6 +192,26 @@ def list_tools(ip=None, username=None, password=None, protocol="https"):
     """
     with _Desk(ip, username, password, protocol) as desk:
         return {tool.name: tool for tool in desk.tools()}
+
+
+def active_tool(ip=None, username=None, password=None, protocol="https", timeout=None):
+    """
+    The end-effector profile active in Desk, the tool the robot compensates.
+
+    Only reads: it never takes the control token.
+
+    Args:
+        ip (str | None): Robot IP (default: from config or 172.16.0.2)
+        username, password, protocol: Desk credentials (default: from config)
+        timeout (float | None): Seconds each request to Desk may take (default: 30)
+
+    Returns:
+        Tool: The active profile
+    """
+    with _Desk(ip, username, password, protocol, timeout=timeout) as desk:
+        tool = _from_desk(desk.request("GET", "/end-effector/profiles/active", token=False).json())
+        tool.active = True
+        return tool
 
 
 def save_tool(name, mass, com, inertia=None, translation=None, rotation=None,

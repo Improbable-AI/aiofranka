@@ -13,6 +13,7 @@ import numpy as np
 import time 
 from aiofranka.robot import RobotInterface, set_macos_control_thread_qos
 from aiofranka.payload import identify_payload
+from aiofranka.config import load_config, tcp_transform
 from ruckig import InputParameter, Ruckig, Trajectory, Result
 
 logger = logging.getLogger(__name__)
@@ -514,19 +515,90 @@ class FrankaController:
             >>> target[2, 3] -= 0.05  # 5 cm down, in the base frame
             >>> await controller.set("ee_desired", target)
         """
-        transform = np.asarray(transform, dtype=float)
-        if transform.shape == (3,):
-            transform = np.block([[np.eye(3), transform[:, None]], [np.zeros(3), 1.0]])
-        rotation = transform[:3, :3] if transform.shape == (4, 4) else None
-        if (rotation is None or not np.allclose(transform[3], [0, 0, 0, 1])
-                or not np.allclose(rotation @ rotation.T, np.eye(3), atol=1e-6)
-                or np.linalg.det(rotation) < 0):
-            raise ValueError("transform must be a translation (3,) or a 4x4 pose with a rotation")
+        transform = tcp_transform(transform)
         with self.state_lock:
             self.control_transform = transform
             # Track the new TCP where it is now, so the arm holds still.
             self.initial_ee = self.robot._ee() @ transform
             self.ee_desired = self.initial_ee.copy()
+
+    def check_tool(self, config):
+        """
+        Check that the tool a configuration needs is the end-effector profile active in Desk.
+
+        The profile is the one RobotInterface read from Desk when it connected. A
+        configuration without a tool, and MuJoCo, which has no Desk, pass.
+
+        Args:
+            config (str | Path | dict): Controller configuration (see aiofranka.config)
+
+        Raises:
+            RuntimeError: If another tool is active, or Desk could not be read
+        """
+        config = load_config(config)
+        name = config.get("tool")
+        if name is None or not self.robot.real:
+            return
+        active = self.robot.tool
+        if active is None:
+            raise RuntimeError(f"The configuration needs the tool {name!r}, but {self.robot.tool_error}. "
+                               "Pass check_tool=False to skip the check.")
+        from aiofranka.tools import NO_END_EFFECTOR
+        matches = active.id == NO_END_EFFECTOR if name.lower() == "none" else active.name == name
+        if matches:
+            return
+        fix = "aiofranka tool unload" if name.lower() == "none" else f"aiofranka tool load '{name}'"
+        raise RuntimeError(f"The configuration needs the tool {name!r}, but the end effector active in Desk "
+                           f"is {active.name!r}. Activate it with: {fix} (then reconnect)")
+
+    def activate(self, config, check_tool=True):
+        """
+        Apply a controller configuration: its mode, gains and policy rate.
+
+        For impedance it sets kp and kd; for osc the TCP, ee_kp, ee_kd, null_kp,
+        null_kd and the null-space target. It then sets the rate of set() to the
+        configuration's frequency. Like switch(), it holds the current joint positions
+        (impedance) or TCP pose (osc); with osc, the null space then pulls the joints
+        toward the null-space target (home by default) while the TCP holds still. See
+        aiofranka.config for the file format.
+
+        Reading a file takes a few milliseconds, which delays the 1 kHz loop that
+        long; while it runs, pass a configuration read before with
+        aiofranka.load_config().
+
+        Args:
+            config (str | Path | dict): YAML file, or its contents
+            check_tool (bool): Refuse a configuration whose tool is not the end
+                effector active in Desk (see check_tool())
+
+        Returns:
+            dict: The configuration, as aiofranka.load_config() reads it
+
+        Raises:
+            ValueError: If the configuration is not valid
+            RuntimeError: If its tool is not the one active in Desk
+
+        Example:
+            >>> controller.activate("configs/osc.yaml")
+            >>> target = controller.ee_desired.copy()
+            >>> target[2, 3] -= 0.05
+            >>> await controller.set("ee_desired", target)  # at the configured frequency
+        """
+        config = load_config(config)
+        if check_tool:
+            self.check_tool(config)
+        if config["mode"] == "osc":
+            self.set_tcp(config["tcp"])
+        self.switch(config["mode"])
+        with self.state_lock:
+            if config["mode"] == "impedance":
+                self.kp, self.kd = config["kp"].copy(), config["kd"].copy()
+            else:
+                self.ee_kp, self.ee_kd = config["ee_kp"].copy(), config["ee_kd"].copy()
+                self.null_kp, self.null_kd = config["null_kp"].copy(), config["null_kd"].copy()
+                self.initial_qpos = config["null_target"].copy()  # the OSC's null-space target
+        self.set_freq(config["frequency"])
+        return config
 
     def step(self):
         self.state = self.robot.state
@@ -757,13 +829,20 @@ class FrankaController:
         # create a trajectory to the desired qpos  (linear interpolation)
         n_steps = int(trajectory.duration * 50)
         eta_total = trajectory.duration
-        for i in range(n_steps):
-            q_desired, _, _ = trajectory.at_time(i / 50.0)
-            await self.set("q_desired", q_desired)
-            done = (i + 1) * 20 // n_steps
-            bar = "█" * done + "░" * (20 - done)
-            eta = eta_total - (i + 1) / 50.0
-            print(f"\r  Moving [{bar}] {(i + 1) * 100 // n_steps}% ETA {eta:.1f}s", end="", flush=True)
+        # The trajectory is sampled at 50 Hz, so play it at 50 Hz whatever set_freq() says.
+        update_freq, self._update_freq = self._update_freq, 50.0
+        self._last_update_time.pop("q_desired", None)
+        try:
+            for i in range(n_steps):
+                q_desired, _, _ = trajectory.at_time(i / 50.0)
+                await self.set("q_desired", q_desired)
+                done = (i + 1) * 20 // n_steps
+                bar = "█" * done + "░" * (20 - done)
+                eta = eta_total - (i + 1) / 50.0
+                print(f"\r  Moving [{bar}] {(i + 1) * 100 // n_steps}% ETA {eta:.1f}s", end="", flush=True)
+        finally:
+            self._update_freq = update_freq
+            self._last_update_time.pop("q_desired", None)
         print()
 
         # await self.stabilize()

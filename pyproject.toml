@@ -33,6 +33,7 @@ dependencies = [
     "requests",
     "pyzmq",
     "msgpack",
+    "pyyaml",
 ]
 
 [project.scripts]

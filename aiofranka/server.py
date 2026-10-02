@@ -1134,7 +1134,7 @@ async def _run_server(robot_ip: str, unlock: bool = True,
     # asyncio control loop (libfranka requires strict 1kHz timing).
     if controller_cls is None:
         controller_cls = ServerController
-    robot = RobotInterface(robot_ip)
+    robot = RobotInterface(robot_ip, read_tool=False)
     controller = controller_cls(robot, shm)
     cmd_handler = CommandHandler(controller, shm, robot_ip)
     cmd_handler._loop = asyncio.get_event_loop()
@@ -1210,7 +1210,7 @@ async def _run_server(robot_ip: str, unlock: bool = True,
                     await asyncio.sleep(2)
 
                     # 7. New robot + controller (old C++ object may be in bad state)
-                    robot = RobotInterface(robot_ip)
+                    robot = RobotInterface(robot_ip, read_tool=False)
                     controller = controller_cls(robot, shm)
                     cmd_handler.controller = controller  # update ZMQ handler ref
 
@@ -1483,7 +1483,7 @@ async def _run_gravcomp_loop(robot_ip: str, damping: float = 0.0,
     """
     from aiofranka.controller import FrankaController
 
-    robot = RobotInterface(robot_ip)
+    robot = RobotInterface(robot_ip, read_tool=False)
     controller = FrankaController(robot)
     controller.kp = np.zeros(7)
     controller.kd = np.ones(7) * damping
@@ -1571,7 +1571,7 @@ async def _run_home_move(robot_ip: str):
     """Move robot to home position. Assumes robot is already unlocked with FCI active."""
     from aiofranka.controller import FrankaController
 
-    robot = RobotInterface(robot_ip)
+    robot = RobotInterface(robot_ip, read_tool=False)
     controller = FrankaController(robot)
 
     base = np.array([1, 1, 1, 1, 0.6, 0.6, 0.6])

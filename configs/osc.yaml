@@ -1,0 +1,10 @@
+# Operational space control, as a policy runs it. Apply with controller.activate("configs/osc.yaml").
+mode: osc
+tool: none                       # Desk end-effector profile; none is "No End Effector"
+ee_kp: 100                       # x, y, z [N/m] and rotation [Nm/rad]: one value, or 6
+ee_kd: 20                        # [N s/m, Nm s/rad]
+null_kp: 9                       # null space [Nm/rad]: one value, or one per joint
+null_kd: 6                       # [Nm s/rad]
+null_target: home                # 7 joint positions [rad], or home
+tcp: [0, 0, 0]                   # TCP in the flange frame: a translation [m] or a 4x4 pose
+frequency: 50                    # policy rate [Hz]

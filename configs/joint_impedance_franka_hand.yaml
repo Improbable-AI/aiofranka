@@ -1,0 +1,7 @@
+# Joint impedance with the Franka Hand, as a policy runs it.
+# Apply with controller.activate("configs/joint_impedance_franka_hand.yaml").
+mode: impedance
+tool: Franka Hand with default configuration   # Desk end-effector profile it needs
+kp: [80, 80, 80, 80, 40, 40, 40]               # [Nm/rad]: one value, or one per joint
+kd: [10, 10, 10, 10, 5, 5, 5]                  # [Nm s/rad]; joint 7 oscillated at kd 20 on the FR3
+frequency: 10                                  # policy rate [Hz]

@@ -1,0 +1,17 @@
+# Operational space control of the Franka Hand's fingertips, as a policy runs it.
+# Apply with controller.activate("configs/osc_franka_hand.yaml").
+mode: osc
+tool: Franka Hand with default configuration   # Desk end-effector profile it needs
+ee_kp: [300, 300, 300, 30, 30, 30]             # x, y, z [N/m] and rotation [Nm/rad]
+ee_kd: [35, 35, 35, 3, 3, 3]                   # [N s/m, Nm s/rad]
+null_kp: 10                                    # null space [Nm/rad]
+null_kd: 2                                     # [Nm s/rad]
+null_target: [0, 0, 0, -1.5708, 0, 1.5708, -0.7854]
+# The TCP as a 4x4 pose in the flange frame: 10.34 cm out, turned -45 deg about z like the
+# hand's fingers (the same as the TCP of Desk's Franka Hand profile).
+tcp:
+- [0.70710678, 0.70710678, 0, 0]
+- [-0.70710678, 0.70710678, 0, 0]
+- [0, 0, 1, 0.1034]
+- [0, 0, 0, 1]
+frequency: 25                                  # policy rate [Hz]

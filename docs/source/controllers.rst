@@ -257,6 +257,60 @@ You can switch between controllers at runtime:
    Switching resets initial states (``initial_qpos``, ``initial_ee``), clears rate-limiting timing, and resets the PID integral term.
 
 
+.. _controller-configurations:
+
+Controller Configuration Files
+------------------------------
+
+A YAML file can hold everything about how a policy drives the robot: the mode, its gains, the
+policy rate and the tool it is for. ``activate()`` applies it in place of ``switch()``, the gains
+and ``set_freq()``:
+
+.. code-block:: yaml
+
+   # configs/osc.yaml
+   mode: osc
+   tool: none                 # Desk end-effector profile it needs; none is "No End Effector"
+   ee_kp: 100                 # x, y, z [N/m] and rotation [Nm/rad]: one value, or 6
+   ee_kd: 20
+   null_kp: 9                 # one value, or one per joint (default 1)
+   null_kd: 6                 # (default 1)
+   null_target: home          # 7 joint positions [rad], or home (the default)
+   tcp: [0, 0, 0]             # TCP in the flange frame: a translation [m] or a 4x4 pose
+   frequency: 50              # policy rate [Hz]
+
+.. code-block:: python
+
+   controller.activate("configs/osc.yaml")
+   # the same as
+   controller.set_tcp([0, 0, 0])
+   controller.switch("osc")
+   controller.ee_kp, controller.ee_kd = np.ones(6) * 100.0, np.ones(6) * 20.0
+   controller.null_kp, controller.null_kd = np.ones(7) * 9.0, np.ones(7) * 6.0
+   controller.initial_qpos = aiofranka.config.HOME.copy()
+   controller.set_freq(50)
+
+A joint impedance file has ``mode: impedance``, ``kp`` and ``kd``. The ``configs/`` folder of the
+repository has examples. ``aiofranka.load_config()`` reads and checks a file; unknown keys are an
+error, so a typo cannot pass silently.
+
+``activate()`` refuses a configuration whose ``tool`` is not the end-effector profile active in
+Desk. ``RobotInterface`` reads the active profile when it connects, with the Desk credentials saved by
+``aiofranka``, because a request to Desk during control would stall the 1 kHz loop; after changing
+the profile, reconnect. If Desk cannot be read, ``activate()`` refuses too; pass
+``check_tool=False`` to skip the check (the system identification collectors: ``--no-check-tool``). In
+MuJoCo there is no Desk and nothing is checked. ``RobotInterface(ip, read_tool=False)`` does not read
+Desk; the server does not.
+
+The system identification examples collect with a configuration (``--activate``) and add what they
+fit to its ``sim`` section, one entry per physics step: the gains and joint parameters with which a
+simulation that runs the controller every physics step responds as the robot did, with the payload
+the fit assumed (merged into ``fr3_link7`` by ``aiofranka.robot.merge_payload()``) and where the
+data came from (``plant``: robot or mujoco). Read one with
+``aiofranka.config.sim_entry(config, physics_dt)``. While the control loop runs, pass
+``activate()`` a configuration read before with ``load_config()``: reading a file takes a few
+milliseconds.
+
 Trajectory Motion
 -----------------
 
