@@ -2097,7 +2097,9 @@ def set_configuration(
         inertia: Inertia matrix as [x11, x12, x13, x22, x23, x33] in kg*m^2.
         translation: F_T_EE translation [x, y, z] in meters.
         rotation: F_T_EE rotation [roll, pitch, yaw] in radians.
-        ee_name: End-effector name (default: current or "custom").
+        ee_name: End-effector type: "None", "FrankaHand", "CobotPump",
+            "GenericCan" or "Other" (default: the current one, or "Other"
+            when setting a mass without an end effector).
         username: Franka Desk web UI username.
         password: Franka Desk web UI password.
         protocol: "http" or "https".
@@ -2158,7 +2160,10 @@ def set_configuration(
         cur_params = cur_ee.get("params", {})
 
         if ee_name is None:
-            ee_name = cur_ee.get("name", "custom")
+            ee_name = cur_ee.get("name", "Other")
+            # A mass needs an end effector to belong to.
+            if ee_name == "None" and mass:
+                ee_name = "Other"
 
         # Merge: start from current, override with user-provided values
         merged = dict(cur_params)

@@ -123,15 +123,31 @@ class RobotInterface:
         """
 
         self.real = ip is not None
+        self.ip = ip
 
         self.model = mujoco.MjModel.from_xml_path(f"{CUR_DIR}/model/fr3.xml")
         self.data = mujoco.MjData(self.model)
 
         self.torque_controller = None
+        # Last pylibfranka.RobotState read from the robot (None in simulation).
+        self.robot_state = None
 
         # End-effector site we wish to control.
         self.site_name = "attachment_site"
         self.site_id = self.model.site(self.site_name).id
+
+        # Load on the flange set with set_load(); the payload merged into the last
+        # link of the MuJoCo model, see sync_payload(); and the inertial of the last
+        # link without it.
+        self.load = {"mass": 0.0, "com": np.zeros(3), "inertia": np.zeros((3, 3))}
+        self.payload = {"mass": 0.0, "com": np.zeros(3), "inertia": np.zeros((3, 3))}
+        last_link = self.model.body("fr3_link7").id
+        self._last_link_inertial = (
+            float(self.model.body_mass[last_link]),
+            self.model.body_ipos[last_link].copy(),
+            self.model.body_iquat[last_link].copy(),
+            self.model.body_inertia[last_link].copy(),
+        )
 
         # The first calls of these take a few hundred microseconds, which would miss
         # the first control cycles. Make them once before the 1 kHz loop starts.
@@ -151,8 +167,12 @@ class RobotInterface:
                 [100.0, 100.0, 100.0, 100.0, 100.0, 100.0],
                 [100.0, 100.0, 100.0, 100.0, 100.0, 100.0],
             )
-            
+            # A load from an earlier connection would add to the active end-effector
+            # profile in Desk, e.g. one activated with aiofranka.load_tool().
+            self.robot.set_load(0.0, [0.0, 0.0, 0.0], [0.0] * 9)
+
             self.sync_mj()
+            self.sync_payload()
 
 
         else: 
@@ -194,15 +214,125 @@ class RobotInterface:
             # e.g. when the interpreter exits.
             self.torque_controller = None
 
+    def set_load(self, mass, com=(0.0, 0.0, 0.0), inertia=(0.0, 0.0, 0.0)):
+        """
+        Set the load attached to the flange, e.g. a tool without a gripper.
 
+        The load is set on the robot, whose internal controller compensates its
+        gravity, and merged into the last link of the MuJoCo model with
+        sync_payload(), so the mass matrix used by the OSC and the simulated
+        dynamics include it. The flange frame is the attachment_site frame. A mass
+        of 0 removes the load.
 
-    def sync_mj(self): 
+        Args:
+            mass (float): Load mass [kg]
+            com (array-like): Center of mass in the flange frame [m] (3,)
+            inertia (array-like): Inertia about the center of mass in the flange
+                frame [kg m^2], as a (3, 3) tensor or its diagonal (3,)
+
+        Raises:
+            RuntimeError: If called while torque control is running
+
+        Caveats:
+            - Call before start(); the robot rejects the load during control
+            - libfranka adds the load to the active end-effector profile in Desk
+            - The load lasts until the next connection, which resets it. To keep a
+              tool, save it as a profile with aiofranka.save_tool() and activate it
+              with aiofranka.load_tool().
+            - The robot rejects a mass without inertia
+        """
+        com = np.asarray(com, dtype=float)
+        inertia = np.asarray(inertia, dtype=float)
+        if inertia.shape == (3,):
+            inertia = np.diag(inertia)
+
+        if self.real:
+            if self.torque_controller is not None:
+                raise RuntimeError("set_load() must be called before start()")
+            self.robot.set_load(float(mass), com.tolist(), inertia.flatten(order="F").tolist())
+
+        self.load = {"mass": float(mass), "com": com, "inertia": inertia}
+        if self.real:
+            # The robot state shows the new load only after a few cycles.
+            deadline = time.time() + 1.0
+            self.sync_mj()
+            while abs(self.robot_state.m_load - mass) > 1e-6 and time.time() < deadline:
+                self.sync_mj()
+        self.sync_payload()
+
+    def sync_payload(self):
+        """
+        Merge the payload that the robot compensates into the MuJoCo model.
+
+        On the real robot, the payload is the end effector configured in Desk plus
+        the load set with set_load(), from the last robot state read. In
+        simulation, it is the load. It replaces the payload merged before, so the
+        mass matrix used by the OSC matches what the robot compensates.
+
+        RobotInterface calls this when it connects and in set_load(). Call it after
+        changing the end effector in Desk while connected, after sync_mj().
+        """
+        if self.real:
+            state = self.robot_state
+            mass = float(state.m_total)
+            com = np.array(state.F_x_Ctotal)
+            inertia = np.array(state.I_total).reshape(3, 3, order="F")
+        else:
+            mass, com, inertia = self.load["mass"], self.load["com"], self.load["inertia"]
+
+        def rotation(quat):
+            mat = np.zeros(9)
+            mujoco.mju_quat2Mat(mat, quat)
+            return mat.reshape(3, 3)
+
+        body = self.model.body("fr3_link7").id
+        link_mass, link_com, link_iquat, link_inertia = self._last_link_inertial
+        rot = rotation(link_iquat)
+        link_tensor = rot @ np.diag(link_inertia) @ rot.T
+
+        # Payload in the link frame, from the attachment_site placement.
+        rot = rotation(self.model.site_quat[self.site_id])
+        load_com = self.model.site_pos[self.site_id] + rot @ com
+        load_tensor = rot @ inertia @ rot.T
+
+        # Combine both about their joint center of mass (parallel axis theorem).
+        total = link_mass + mass
+        total_com = (link_mass * link_com + mass * load_com) / total
+
+        def parallel_axis(m, offset):
+            return m * (offset @ offset * np.eye(3) - np.outer(offset, offset))
+
+        tensor = (
+            link_tensor + parallel_axis(link_mass, link_com - total_com)
+            + load_tensor + parallel_axis(mass, load_com - total_com)
+        )
+        principal, axes = np.linalg.eigh(tensor)
+        if np.linalg.det(axes) < 0:
+            axes[:, 0] *= -1
+        quat = np.zeros(4)
+        mujoco.mju_mat2Quat(quat, axes.flatten())
+
+        self.model.body_mass[body] = total
+        self.model.body_ipos[body] = total_com
+        self.model.body_iquat[body] = quat
+        self.model.body_inertia[body] = principal
+
+        # mj_setConst resets the state to qpos0, so keep the current one.
+        qpos, qvel = self.data.qpos.copy(), self.data.qvel.copy()
+        mujoco.mj_setConst(self.model, self.data)
+        self.data.qpos, self.data.qvel = qpos, qvel
+        mujoco.mj_forward(self.model, self.data)
+
+        self.payload = {"mass": mass, "com": com, "inertia": inertia}
+
+    def sync_mj(self):
         """ Sync mujoco state with real robot state """
 
         if self.torque_controller is None:
             robot_state = self.robot.read_once()
         else:
             robot_state, _ = self.torque_controller.readOnce()
+        self.robot_state = robot_state
 
         self.data.qpos = np.array(robot_state.q)
         self.data.qvel = np.array(robot_state.dq)

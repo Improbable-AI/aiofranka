@@ -239,10 +239,7 @@ def cmd_start(args):
 
 
 def cmd_gravcomp(args):
-    from aiofranka.server import (
-        _DeskClientV2, _load_token_state, _save_token_state, _clear_token,
-        run_gravcomp_loop,
-    )
+    from aiofranka.server import _DeskClientV2, _clear_token, run_gravcomp_loop
 
     robot_ip = _resolve_ip(args.ip)
     protocol = args.protocol
@@ -252,56 +249,9 @@ def cmd_gravcomp(args):
     print(f"\n  {BOLD}aiofranka{RST} {DIM}|{RST} gravcomp {DIM}({robot_ip}){RST}")
     print(f"  {DIM}kp=0  kd={damping}  (Ctrl+C stops control; joints stay unlocked){RST}\n")
 
-    setup_total = 4
     try:
         client = _DeskClientV2(robot_ip, username, password, protocol=protocol)
-
-        # Reuse saved token from a prior `aiofranka unlock` if available
-        saved_token, saved_token_id = _load_token_state(robot_ip)
-        if saved_token is not None:
-            client._token = saved_token
-            client._token_id = saved_token_id
-            if not client.validate_token():
-                client._token = None
-                client._token_id = None
-
-        # Step 1: Acquire control token
-        if client._token is None:
-            _cli_run_with_spinner("Acquiring control token", 1, setup_total,
-                                  client.take_token, timeout=15)
-        else:
-            print(_cli_step_line(1, setup_total, "Acquiring control token",
-                                 f"{GREEN}done{RST} {DIM}(reused){RST}"))
-
-        try:
-            # Step 2: Recover safety errors
-            _cli_run_with_spinner("Recovering safety errors", 2, setup_total,
-                                  client.recover_errors)
-
-            # Step 3: Unlock joints
-            if client.are_joints_unlocked():
-                print(_cli_step_line(3, setup_total, "Unlocking joints",
-                                     f"{GREEN}done{RST} {DIM}(already){RST}"))
-            else:
-                _cli_run_with_spinner("Unlocking joints", 3, setup_total,
-                                      client.unlock)
-
-            # Step 4: Activate FCI
-            if client.is_fci_active():
-                print(_cli_step_line(4, setup_total, "Activating FCI",
-                                     f"{GREEN}done{RST} {DIM}(already){RST}"))
-            else:
-                _cli_run_with_spinner("Activating FCI", 4, setup_total,
-                                      client.activate_fci)
-
-            _save_token_state(robot_ip, client._token, client._token_id)
-        except Exception:
-            try:
-                client.release_token(best_effort=True)
-                _clear_token(robot_ip)
-            except Exception:
-                pass
-            raise
+        _cli_take_control(client, robot_ip)
 
         print(f"\n  {GREEN}Running{RST} {DIM}— robot is in gravity compensation mode{RST}")
         print(f"  {DIM}You can freely move the robot by hand. Press Ctrl+C to stop.{RST}\n")
@@ -326,10 +276,7 @@ def cmd_gravcomp(args):
 
 
 def cmd_home(args):
-    from aiofranka.server import (
-        _DeskClientV2, _load_token_state, _save_token_state, _clear_token,
-        run_home_move,
-    )
+    from aiofranka.server import _DeskClientV2, _clear_token, run_home_move
 
     robot_ip = _resolve_ip(args.ip)
     protocol = args.protocol
@@ -337,51 +284,9 @@ def cmd_home(args):
 
     print(f"\n  {BOLD}aiofranka{RST} {DIM}|{RST} home {DIM}({robot_ip}){RST}\n")
 
-    setup_total = 4
     try:
         client = _DeskClientV2(robot_ip, username, password, protocol=protocol)
-
-        saved_token, saved_token_id = _load_token_state(robot_ip)
-        if saved_token is not None:
-            client._token = saved_token
-            client._token_id = saved_token_id
-            if not client.validate_token():
-                client._token = None
-                client._token_id = None
-
-        if client._token is None:
-            _cli_run_with_spinner("Acquiring control token", 1, setup_total,
-                                  client.take_token, timeout=15)
-        else:
-            print(_cli_step_line(1, setup_total, "Acquiring control token",
-                                 f"{GREEN}done{RST} {DIM}(reused){RST}"))
-
-        try:
-            _cli_run_with_spinner("Recovering safety errors", 2, setup_total,
-                                  client.recover_errors)
-
-            if client.are_joints_unlocked():
-                print(_cli_step_line(3, setup_total, "Unlocking joints",
-                                     f"{GREEN}done{RST} {DIM}(already){RST}"))
-            else:
-                _cli_run_with_spinner("Unlocking joints", 3, setup_total,
-                                      client.unlock)
-
-            if client.is_fci_active():
-                print(_cli_step_line(4, setup_total, "Activating FCI",
-                                     f"{GREEN}done{RST} {DIM}(already){RST}"))
-            else:
-                _cli_run_with_spinner("Activating FCI", 4, setup_total,
-                                      client.activate_fci)
-
-            _save_token_state(robot_ip, client._token, client._token_id)
-        except Exception:
-            try:
-                client.release_token(best_effort=True)
-                _clear_token(robot_ip)
-            except Exception:
-                pass
-            raise
+        _cli_take_control(client, robot_ip)
 
         print()
         run_home_move(robot_ip)
@@ -857,7 +762,19 @@ def cmd_status(args):
             print()
             print(f"  {BOLD}End Effector{RST}")
             ee_name = ee.get("name", "?")
-            print(f"    Type ............. {ee_name}")
+            # The configuration names only the kind ("Other"); the active Desk profile has the tool's name.
+            try:
+                from aiofranka.tools import list_tools
+
+                active = next((t for t in list_tools(robot_ip, username, password, protocol).values()
+                               if t.active), None)
+            except Exception:
+                active = None
+            if active is not None:
+                device = "Franka Hand" if active.device == "ee-gripper" else "Generic Device"
+                print(f"    Tool ............. {active.name}  {DIM}{device}{RST}")
+            else:
+                print(f"    Type ............. {ee_name}")
 
             params = ee.get("params", {})
             if "mass" in params:
@@ -1129,6 +1046,204 @@ def cmd_config(args):
                 client.release_token(best_effort=True)
             except Exception:
                 pass
+
+
+def _print_tool(tool):
+    def fmt(values):
+        return ", ".join(f"{v:.4f}" for v in values)
+
+    mark = f" {GREEN}(active){RST}" if tool.active else ""
+    device = "Franka Hand" if tool.device == "ee-gripper" else "Generic Device"
+    print(f"  {BOLD}{tool.name}{RST}{mark}  {DIM}{device}{RST}")
+    print(f"    Mass ............. {tool.mass:.3f} kg")
+    print(f"    CoM .............. [{fmt(tool.com)}] m")
+    print(f"    Inertia (diag) ... [{fmt(tool.inertia.diagonal())}] kg*m^2")
+    print(f"    TCP .............. [{fmt(tool.translation)}] m, RPY [{fmt(tool.rotation)}] rad")
+
+
+def _cli_take_control(client, robot_ip: str):
+    """Take the control token, recover errors, unlock the joints and activate FCI."""
+    from aiofranka.server import _load_token_state, _save_token_state, _clear_token
+
+    total = 4
+    saved_token, saved_token_id = _load_token_state(robot_ip)
+    if saved_token is not None:
+        client._token = saved_token
+        client._token_id = saved_token_id
+        if not client.validate_token():
+            client._token = None
+            client._token_id = None
+
+    if client._token is None:
+        _cli_run_with_spinner("Acquiring control token", 1, total, client.take_token, timeout=15)
+    else:
+        print(_cli_step_line(1, total, "Acquiring control token", f"{GREEN}done{RST} {DIM}(reused){RST}"))
+
+    try:
+        _cli_run_with_spinner("Recovering safety errors", 2, total, client.recover_errors)
+        if client.are_joints_unlocked():
+            print(_cli_step_line(3, total, "Unlocking joints", f"{GREEN}done{RST} {DIM}(already){RST}"))
+        else:
+            _cli_run_with_spinner("Unlocking joints", 3, total, client.unlock)
+        if client.is_fci_active():
+            print(_cli_step_line(4, total, "Activating FCI", f"{GREEN}done{RST} {DIM}(already){RST}"))
+        else:
+            _cli_run_with_spinner("Activating FCI", 4, total, client.activate_fci)
+        _save_token_state(robot_ip, client._token, client._token_id)
+    except Exception:
+        try:
+            client.release_token(best_effort=True)
+            _clear_token(robot_ip)
+        except Exception:
+            pass
+        raise
+
+
+async def _identify_tool(robot_ip: str, kwargs: dict):
+    """Connect and identify the tool on the flange; identify_payload() starts and stops the loop."""
+    import numpy as np
+    from aiofranka.controller import FrankaController
+    from aiofranka.robot import RobotInterface
+
+    controller = FrankaController(RobotInterface(robot_ip))
+    # Joint impedance gains as for moving home.
+    gains = np.array([1, 1, 1, 1, 0.6, 0.6, 0.6])
+    controller.kp, controller.kd = gains * 80, gains * 4
+    return await controller.identify_payload(**kwargs)
+
+
+def _ask_number(label: str, value: float) -> float:
+    """Ask for a number, keeping value on Enter."""
+    while True:
+        text = input(f"    {label} [{value:g}]: ").strip()
+        if not text:
+            return value
+        try:
+            return float(text)
+        except ValueError:
+            print(f"    {RED}Not a number{RST}")
+
+
+def _confirm_tool(name: str, mass: float, com, activate: bool):
+    """
+    Ask whether to save the tool, offering to edit its mass and center of mass.
+
+    Returns the (mass [kg], com [m]) to save, or None to not save.
+    """
+    import numpy as np
+
+    action = "Save and activate" if activate else "Save"
+    print()
+    while True:
+        answer = input(f"  {action} it as {BOLD}{name}{RST} in Desk? [Y]es, [e]dit, [n]o: ").strip().lower()
+        if answer in ("", "y", "yes"):
+            return mass, com
+        if answer in ("n", "no"):
+            return None
+        if answer in ("e", "edit"):
+            print(f"  {DIM}Enter keeps a value.{RST}")
+            mass = _ask_number("Mass [g]", round(1e3 * mass, 1)) / 1e3
+            com = np.array([_ask_number(f"Center of mass {axis} [mm]", round(1e3 * c, 1))
+                            for axis, c in zip("xyz", com)]) / 1e3
+            mm = ", ".join(f"{axis} {1e3 * c:+.1f}" for axis, c in zip("xyz", com))
+            print(f"\n  {1e3 * mass:.1f} g, center of mass {mm} mm")
+
+
+def cmd_tool(args):
+    import asyncio
+    from aiofranka import tools
+
+    command = args.tool_command
+    try:
+        robot_ip = _resolve_ip(args.ip)
+        username, password = _resolve_credentials(args)
+        desk = dict(ip=robot_ip, username=username, password=password, protocol=args.protocol)
+        print(f"\n  {BOLD}aiofranka{RST} {DIM}|{RST} tool {command} {DIM}({robot_ip}){RST}\n")
+
+        if command == "list":
+            for tool in tools.list_tools(**desk).values():
+                _print_tool(tool)
+            print()
+
+        elif command == "load":
+            tool = _cli_run_with_spinner(f"Activating {args.name}", 1, 1, tools.load_tool, args.name, **desk)
+            print()
+            _print_tool(tool)
+            print(f"\n  {DIM}Programs connected to the robot pick it up when they reconnect.{RST}\n")
+
+        elif command == "unload":
+            tool = _cli_run_with_spinner("Activating No End Effector", 1, 1, tools.unload_tool, **desk)
+            print()
+            _print_tool(tool)
+            print(f"\n  {DIM}Programs connected to the robot pick it up when they reconnect.{RST}\n")
+
+        elif command == "remove":
+            if not args.yes and input(f"  Delete {args.name} from Desk? [y/N] ").strip().lower() != "y":
+                print()
+                return
+            _cli_run_with_spinner(f"Removing {args.name}", 1, 1, tools.remove_tool, args.name, **desk)
+            print()
+
+        elif command == "identify":
+            from aiofranka.server import _DeskClientV2, _clear_token
+
+            pid = _check_server_running(robot_ip)
+            if pid is not None:
+                print(f"  {RED}Error:{RST} A server (PID {pid}) is connected to the robot. "
+                      f"Stop it with {BOLD}aiofranka stop{RST} first.\n")
+                return
+
+            client = _DeskClientV2(robot_ip, username, password, protocol=args.protocol)
+            _cli_take_control(client, robot_ip)
+            try:
+                print()
+                print(_wrap(
+                    f"The robot will move through {args.poses} poses around the current one, "
+                    "approaching each from both sides, checked for collisions with a "
+                    f"{args.tool_length} m x {args.tool_radius} m cylinder around the tool and a "
+                    f"floor at {args.floor} m. Start in an open pose and keep a hand on the e-stop."
+                ))
+                if not args.yes:
+                    input(f"\n  Press Enter to start, Ctrl+C to cancel... ")
+                print()
+                estimate = asyncio.run(_identify_tool(robot_ip, dict(
+                    n_poses=args.poses, speed=args.speed, tool_length=args.tool_length,
+                    tool_radius=args.tool_radius, floor=args.floor,
+                )))
+
+                mass, com = estimate.mass, estimate.com
+                if not args.yes:
+                    chosen = _confirm_tool(args.name, mass, com, activate=not args.no_load)
+                    if chosen is None:
+                        print()
+                        return
+                    mass, com = chosen
+                print()
+                steps = 1 if args.no_load else 2
+                tool = _cli_run_with_spinner(f"Saving {args.name}", 1, steps, tools.save_tool,
+                                             args.name, mass, com, **desk)
+                if not args.no_load:
+                    tool = _cli_run_with_spinner(f"Activating {args.name}", 2, steps, tools.load_tool,
+                                                 args.name, **desk)
+            finally:
+                try:
+                    _cli_run_with_spinner("Releasing control token", 1, 1, client.release_token)
+                    _clear_token(robot_ip)
+                except Exception:
+                    pass
+
+            print()
+            _print_tool(tool)
+            print()
+    except KeyboardInterrupt:
+        print()
+    except SystemExit:
+        # The control loop exits when the robot aborts the motion; it printed why.
+        print(f"\n  {RED}Error:{RST} The control loop stopped, nothing was saved.\n")
+    except (KeyError, ValueError) as e:
+        print(f"\n  {RED}Error:{RST} {e.args[0] if e.args else e}\n")
+    except Exception as e:
+        print(f"\n  {RED}Error:{RST} {e}\n")
 
 
 def _check_server_running(robot_ip: str) -> int | None:
@@ -2255,6 +2370,42 @@ def main():
     p_config.add_argument("--ee-name", type=str, default=None,
                           help="End-effector type (FrankaHand, None, Other, etc.)")
 
+    # tool
+    p_tool = subparsers.add_parser("tool", help="Identify and load end-effector profiles in Desk")
+    tool_sub = p_tool.add_subparsers(dest="tool_command")
+
+    def tool_parser(name, help):
+        p = tool_sub.add_parser(name, help=help)
+        p.add_argument("--ip", type=str, default=None, help="Robot IP")
+        p.add_argument("--username", type=str, default="admin", help="Robot web UI username")
+        p.add_argument("--password", type=str, default="admin", help="Robot web UI password")
+        p.add_argument("--protocol", type=str, default="https", choices=["http", "https"])
+        return p
+
+    tool_parser("list", "List the end-effector profiles in Desk")
+    tool_parser("load", "Activate an end-effector profile").add_argument("name")
+    tool_parser("unload", 'Activate the built-in "No End Effector" profile')
+    p_tool_remove = tool_parser("remove", "Delete an end-effector profile")
+    p_tool_remove.add_argument("name")
+    p_tool_remove.add_argument("-y", "--yes", action="store_true", help="Do not ask before deleting")
+
+    p_tool_identify = tool_parser(
+        "identify", "Identify the tool on the flange, save it as a profile and activate it (moves the robot)")
+    p_tool_identify.add_argument("name")
+    p_tool_identify.add_argument("--poses", type=int, default=16, help="Number of poses (default: 16)")
+    p_tool_identify.add_argument("--speed", type=float, default=0.5,
+                                 help="Peak joint speed in rad/s (default: 0.5)")
+    p_tool_identify.add_argument("--tool-length", type=float, default=0.2,
+                                 help="Tool length from the flange in m, for collision checks (default: 0.2)")
+    p_tool_identify.add_argument("--tool-radius", type=float, default=0.1,
+                                 help="Tool radius in m, for collision checks (default: 0.1)")
+    p_tool_identify.add_argument("--floor", type=float, default=0.0,
+                                 help="Floor or table height in the base frame in m; the robot keeps "
+                                      "5 cm from it (default: 0, the mounting plane)")
+    p_tool_identify.add_argument("--no-load", action="store_true",
+                                 help="Only save the profile, without activating it")
+    p_tool_identify.add_argument("-y", "--yes", action="store_true", help="Do not ask before moving or saving")
+
     # log
     p_log = subparsers.add_parser("log", help="View server log")
     p_log.add_argument("-n", type=int, default=20, help="Number of lines to show (default: 20)")
@@ -2306,6 +2457,11 @@ def main():
         cmd_mode(args)
     elif args.command == "config":
         cmd_config(args)
+    elif args.command == "tool":
+        if args.tool_command is None:
+            p_tool.print_help()
+        else:
+            cmd_tool(args)
     elif args.command == "log":
         cmd_log(args)
     elif args.command == "gripper":

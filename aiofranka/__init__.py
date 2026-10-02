@@ -33,6 +33,7 @@ from aiofranka.async_utils import asyncify, async_input, CudaInferenceThread, mp
 from aiofranka.remote import FrankaRemoteController, ServerDiedError
 from aiofranka.remote_v2 import FrankaRemoteControllerV2
 from aiofranka.server import start, stop, lock, unlock, set_configuration
+from aiofranka.tools import Tool, list_tools, load_tool, remove_tool, save_tool, unload_tool
 
 # Optional gripper support - only import if dependencies are available
 try:
@@ -47,7 +48,7 @@ try:
 except PackageNotFoundError:
     __version__ = "0+unknown"
 
-__all__ = ["RobotInterface", "FrankaController", "FrankaRemoteController", "FrankaRemoteControllerV2", "ServerDiedError", "asyncify", "async_input", "CudaInferenceThread", "mpify", "start", "stop", "lock", "unlock", "set_configuration"]
+__all__ = ["RobotInterface", "FrankaController", "FrankaRemoteController", "FrankaRemoteControllerV2", "ServerDiedError", "asyncify", "async_input", "CudaInferenceThread", "mpify", "start", "stop", "lock", "unlock", "set_configuration", "Tool", "list_tools", "load_tool", "remove_tool", "save_tool", "unload_tool"]
 
 if _HAS_ROBOTIQ:
     __all__.extend(["GripperController", "GripperRemoteController", "RobotiqGripperInterface", "create_gripper"])

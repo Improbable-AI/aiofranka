@@ -12,6 +12,7 @@ from pathlib import Path
 import numpy as np 
 import time 
 from aiofranka.robot import RobotInterface, set_macos_control_thread_qos
+from aiofranka.payload import identify_payload
 from ruckig import InputParameter, Ruckig, Trajectory, Result
 
 logger = logging.getLogger(__name__)
@@ -57,9 +58,13 @@ class FrankaController:
         
         # Target states
         q_desired (np.ndarray): Desired joint positions [rad] (7,)
-        ee_desired (np.ndarray): Desired EE pose as 4x4 transform
+        ee_desired (np.ndarray): Desired pose of the OSC control frame as 4x4 transform
         torque (np.ndarray): Direct torque command [Nm] (7,)
-        
+        control_transform (np.ndarray): Tool center point that the OSC controls, in
+            the flange frame, 4x4 (default: identity, i.e. the flange); see set_tcp()
+        last_command (np.ndarray): Last torque sent to the robot, after rate
+            limiting and clipping [Nm] (7,)
+
         # Safety
         clip (bool): Enable torque rate limiting (default: True)
         torque_diff_limit (float): Max torque rate [Nm/s] (default: 990)
@@ -112,8 +117,10 @@ class FrankaController:
             - Null-space: null_kp=1, null_kd=1
         """
         self.robot = robot
+        self.control_transform = np.eye(4)
+        self.last_command = np.zeros(7)
 
-        self.initialize() 
+        self.initialize()
         self.state_lock = threading.Lock()
 
         self.type = "impedance"
@@ -178,7 +185,7 @@ class FrankaController:
         # concurrently with the active torque control loop (would drop TCP connection)
         self.initial_qpos = deepcopy(self.robot.data.qpos)
         self.initial_qvel = deepcopy(self.robot.data.qvel)
-        self.initial_ee = self.robot._ee()
+        self.initial_ee = self.robot._ee() @ self.control_transform
 
         self.q_desired = self.initial_qpos
         self.ee_desired = self.initial_ee
@@ -435,31 +442,31 @@ class FrankaController:
     def switch(self, controller_type: str):
         """
         Switch between control modes at runtime.
-        
+
         Changes the active controller without stopping the control loop. Resets
         the initial state (initial_qpos, initial_ee) to current robot state and
         clears rate-limiting timing.
-        
+
         Args:
             controller_type (str): Controller type to switch to:
                 - "impedance": Joint-space impedance control
                 - "pid": Joint-space PID control with integral term
                 - "osc": Operational space control (task space)
                 - "torque": Direct torque control
-                
+
         Example:
             >>> controller.switch("impedance")
             >>> controller.kp = np.ones(7) * 80
             >>> # ... run impedance control ...
-            >>> 
+            >>>
             >>> controller.switch("osc")
             >>> controller.ee_kp = np.array([300, 300, 300, 1000, 1000, 1000])
             >>> # ... run OSC control ...
-            
+
         Note:
             - Can be called while control loop is running
             - Resets q_desired to current position
-            - Resets ee_desired to current end-effector pose
+            - Resets ee_desired to current pose of the control frame
             - Clears timing state from previous set() calls
             - Resets integral term when switching to/from PID
             
@@ -480,6 +487,47 @@ class FrankaController:
             print(f"Switched to {controller_type} controller.")
             print("==================================")
 
+    def set_tcp(self, transform):
+        """
+        Set the tool center point (TCP) that the OSC controls, relative to the flange.
+
+        The OSC then tracks ee_desired with this frame instead of the flange. Express
+        it in the flange frame (the attachment_site of the MuJoCo model): its origin
+        is the center of the flange face, z points out of the flange, and the box on
+        the side of link 7 points between +x and +y. The docs show it on the robot
+        (Controllers > Operational Space Control > Tool Center Point). ee_desired
+        becomes the current pose of the new TCP, so the arm holds still.
+
+        The TCP of the end-effector profile in Desk is not used here.
+
+        Args:
+            transform (array-like): Pose of the TCP in the flange frame as a 4x4
+                transform, or its translation [m] (3,) for the flange's orientation
+
+        Raises:
+            ValueError: If transform is not a translation or a 4x4 pose
+
+        Example:
+            >>> controller.switch("osc")
+            >>> controller.set_tcp([0, 0, 0.1034])  # Franka Hand fingertips
+            >>> target = controller.ee_desired.copy()
+            >>> target[2, 3] -= 0.05  # 5 cm down, in the base frame
+            >>> await controller.set("ee_desired", target)
+        """
+        transform = np.asarray(transform, dtype=float)
+        if transform.shape == (3,):
+            transform = np.block([[np.eye(3), transform[:, None]], [np.zeros(3), 1.0]])
+        rotation = transform[:3, :3] if transform.shape == (4, 4) else None
+        if (rotation is None or not np.allclose(transform[3], [0, 0, 0, 1])
+                or not np.allclose(rotation @ rotation.T, np.eye(3), atol=1e-6)
+                or np.linalg.det(rotation) < 0):
+            raise ValueError("transform must be a translation (3,) or a 4x4 pose with a rotation")
+        with self.state_lock:
+            self.control_transform = transform
+            # Track the new TCP where it is now, so the arm holds still.
+            self.initial_ee = self.robot._ee() @ transform
+            self.ee_desired = self.initial_ee.copy()
+
     def step(self):
         self.state = self.robot.state
         if self.type == "impedance":
@@ -493,14 +541,22 @@ class FrankaController:
         else:
             raise ValueError(f"Unknown controller type: {self.type}")
 
+    def _send(self, torque):
+        self.last_command = torque
+        self.robot.step(torque)
+
     def _torque_step(self, state):
 
-        self.robot.step(self.torque)
+        self._send(self.torque)
 
-    def _osc_step(self, state): 
+    def _osc_step(self, state):
 
-        jac = state['jac']
-        ee = state['ee']
+        # Pose and Jacobian of the control frame. Its origin moves with
+        # v + w x r, where r is its offset from attachment_site.
+        ee = state['ee'] @ self.control_transform
+        offset = ee[:3, 3] - state['ee'][:3, 3]
+        jac = state['jac'].copy()
+        jac[:3] += np.cross(jac[3:].T, offset).T
         q = state['qpos']
         dq = state['qvel']
         mm = state['mm']
@@ -549,9 +605,11 @@ class FrankaController:
             diff = np.clip(diff, -self.torque_diff_limit, self.torque_diff_limit)
             tau_d = last_torque + diff * 1e-3
 
-        self.robot.step(tau_d)
+            tau_d = np.clip(tau_d, -self.torque_limit, self.torque_limit)
 
-    
+        self._send(tau_d)
+
+
 
 
     def _pid_step(self, robot_state):
@@ -595,7 +653,7 @@ class FrankaController:
             tau_d = last_torque + diff * 1e-3
 
         self.torque = tau_d
-        self.robot.step(tau_d)
+        self._send(tau_d)
 
     def _impedance_step(self, robot_state): 
 
@@ -630,7 +688,7 @@ class FrankaController:
             
         self.torque = tau_d
 
-        self.robot.step(tau_d)
+        self._send(tau_d)
 
 
     async def move(self, qpos = [0, 0, 0.0, -1.57079, 0, 1.57079, -0.7853]):
@@ -709,3 +767,33 @@ class FrankaController:
         print()
 
         # await self.stabilize()
+
+    async def identify_payload(self, tool_length=0.2, tool_radius=0.1, floor=0.0, **kwargs):
+        """
+        Identify the mass and center of mass of the tool on the flange.
+
+        Moves through poses around the current one, measures the joint torques at
+        rest that the robot does not compensate, and fits the tool to them. It only
+        measures: save the result with aiofranka.save_tool() and activate it with
+        aiofranka.load_tool(). See aiofranka.payload.identify_payload() for the
+        details and further arguments.
+
+        Args:
+            tool_length (float): Length of the tool from the flange [m], for the
+                collision checks (default: 0.2)
+            tool_radius (float): Radius of the tool [m] (default: 0.1)
+            floor (float): Height of the floor or table in the base frame [m]
+                (default: 0.0)
+            **kwargs: Further arguments of aiofranka.payload.identify_payload()
+
+        Returns:
+            PayloadEstimate: Estimated tool, with standard errors
+
+        Example:
+            >>> estimate = await controller.identify_payload(tool_length=0.25)
+            >>> aiofranka.save_tool("gripper", estimate.mass, estimate.com)
+            >>> aiofranka.load_tool("gripper")
+        """
+        return await identify_payload(
+            self, tool_length=tool_length, tool_radius=tool_radius, floor=floor, **kwargs,
+        )

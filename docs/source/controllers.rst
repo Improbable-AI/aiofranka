@@ -163,6 +163,35 @@ Example with scipy:
    ee[:3, :3] = R.from_euler('xyz', [180, 0, 0], degrees=True).as_matrix()
    ee[:3, 3] = [0.5, 0.0, 0.4]  # meters
 
+Tool Center Point
+~~~~~~~~~~~~~~~~~
+
+By default, the OSC controls the flange. To control a point on the tool instead, e.g. the
+fingertips, set the tool center point (TCP) as a pose in the flange frame:
+
+.. code-block:: python
+
+   controller.switch("osc")
+   controller.set_tcp([0, 0, 0.1034])     # a translation, here the Franka Hand fingertips
+
+   tcp = np.eye(4)                        # or a 4x4 pose, also rotating the controlled frame
+   tcp[:3, :3] = R.from_euler('z', -45, degrees=True).as_matrix()
+   tcp[:3, 3] = [0, 0, 0.1034]
+   controller.set_tcp(tcp)
+
+From then on, ``ee_desired`` is the pose of the TCP in the base frame. ``set_tcp()`` sets it to the
+TCP's current pose, so the arm holds still, and the TCP stays in effect when you switch controllers.
+The TCP of the end-effector profile in Desk is not used.
+
+The flange frame has its origin at the center of the flange face and its z-axis pointing out of the
+flange; the box on the side of link 7 points between +x and +y. Here it is at the home pose, with x
+red, y green and z blue, and on the right a TCP 10 cm along z:
+
+.. image:: images/flange_frame.png
+   :alt: The flange frame of the FR3: z points out of the flange, x and y lie in the flange face.
+
+The frame is the ``attachment_site`` of the MuJoCo model, which ``robot.state["ee"]`` reports.
+
 **Best for**: Cartesian motions, end-effector tracking, teleoperation.
 
 **Default gains**: ``ee_kp = 100``, ``ee_kd = 4`` (all 6 axes); ``null_kp = 1``, ``null_kd = 1`` (per joint).
@@ -248,6 +277,74 @@ In async mode, use ``await controller.move(...)``.
 - Max velocity: 10 rad/s per joint
 - Max acceleration: 5 rad/s per joint squared
 - Max jerk: 1 rad/s per joint cubed
+
+
+.. _payload-identification:
+
+Payload Identification
+----------------------
+
+The robot compensates the gravity of the arm and of the tool on the flange, as configured by the
+active end-effector profile in Desk (Settings > End Effector). ``RobotInterface`` merges the profile
+into the MuJoCo model when it connects, so the mass matrix used by the OSC includes it too. If the
+profile does not match the tool, the arm drifts in torque control, e.g. with zero torques.
+
+``identify_payload()`` measures the mass and center of mass of the tool, starting from any profile,
+e.g. "No End Effector". Save the result as a profile and activate it:
+
+.. code-block:: python
+
+   import aiofranka
+
+   controller = aiofranka.FrankaController(aiofranka.RobotInterface("172.16.0.2"))
+   estimate = await controller.identify_payload(tool_length=0.25)   # moves the robot
+   aiofranka.save_tool("gripper", estimate.mass, estimate.com)       # create or update the profile
+   aiofranka.load_tool("gripper")                                     # activate it
+
+It plans the poses around the current one first. Planning computes for a few tenths of a second,
+and the robot aborts the motion when the 1 kHz control loop stalls that long, so a running
+controller is stopped while planning, with the robot holding still, and started again; one that
+was not started is started for the identification and stopped afterwards.
+
+Or from the CLI, which does all of this: ``aiofranka tool identify gripper`` (see :doc:`cli`).
+``list_tools()`` and ``remove_tool()`` list and delete profiles. Desk keeps the profiles and the
+active one across reboots, and the web UI shows them too.
+
+``identify_payload()`` moves through 16 poses around the current one, in which the flange points in
+different directions, and measures the joint torques at rest that the robot does not compensate.
+Part of the joint friction acts past the torque sensors, so at rest they also see part of the torque
+with which the controller holds each joint against stiction: on an FR3, a few tenths of a Nm that
+flips sign with the side the joint came from. So it approaches each pose from both sides, 0.08 rad
+away, and averages. The torques are linear in the mass and first moment of the tool, which least
+squares fits together with a torque offset per joint. It takes about 3 minutes.
+
+``estimate`` has the mass and the center of mass in the flange frame with their standard errors, and
+the RMS of the residual torques per joint before and after. Running it again with the new profile
+active checks the result: the correction should be close to zero.
+
+The precision depends on the torque noise. With the 16 planned poses, the standard error of the mass
+is about 9 g per 0.05 Nm of residual torque noise, and that of the first moment ``mass * com`` about
+1 g·m. The center of mass is therefore good to about 1 mm for a 1 kg tool, but only to about 1 cm
+for a 100 g one, so light tools are better weighed. Twice the poses gains only a factor of √2. Check
+``estimate.mass_std`` and ``estimate.com_std`` before using the result.
+
+.. note::
+   - The inertia does not change the gravity torques, so it cannot be identified at rest.
+     ``save_tool()`` keeps a profile's inertia, and gives a new one that of a 5 cm solid sphere,
+     since the robot rejects a mass without inertia. Pass ``inertia`` to set it.
+   - ``save_tool()`` keeps a profile's tool center point unless you pass ``translation`` and
+     ``rotation``.
+   - Activating a profile needs the control token: aiofranka uses the one ``aiofranka unlock`` saved,
+     or takes it for the call. Programs connected to the robot pick up a new profile when they
+     reconnect.
+   - ``robot.set_load()`` adds a load on top of the profile for one connection; ``RobotInterface``
+     resets it when it connects.
+
+.. warning::
+   The planned poses are only checked for collisions of the arm, a cylinder around the tool
+   (``tool_length=0.2``, ``tool_radius=0.1`` m by default) and the floor (``floor=0.0`` m, the
+   mounting plane, by default), from which the arm and tool keep 5 cm. Start in an open pose,
+   keep other obstacles out of reach, and stay close to the e-stop.
 
 
 Safety Features

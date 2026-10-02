@@ -42,6 +42,7 @@ Contents
    api/remote
    api/controller
    api/robot
+   api/payload
    api/server
    api/gripper
    api/utilities

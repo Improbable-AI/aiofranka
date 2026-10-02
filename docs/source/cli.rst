@@ -14,6 +14,7 @@ The CLI handles robot setup, server lifecycle, and diagnostics.
    aiofranka stop     [--ip IP]              Stop a running server
    aiofranka mode     [--ip IP] [--set MODE] View/change operating mode
    aiofranka config   [--ip IP] [--mass M]   View/set end-effector config
+   aiofranka tool     identify|load|list ... Identify, save and load tools
    aiofranka selftest [--ip IP] [--force]    Run safety self-tests
    aiofranka log      [-n LINES] [-f]        View server logs
    aiofranka gripper  --open|--close          Control the Robotiq gripper
@@ -89,7 +90,8 @@ config
 ------
 
 View or set the end-effector configuration (mass, center of mass, inertia,
-flange-to-EE transform). Changes are applied via the Franka Desk API.
+flange-to-EE transform). Changes are applied via the Franka Desk API to the active
+end-effector profile; to keep several tools by name, use ``aiofranka tool`` below.
 
 .. code-block:: bash
 
@@ -105,6 +107,38 @@ You can also set end-effector configuration from Python:
    aiofranka.unlock()
    aiofranka.set_configuration(mass=0.5, com=[0, 0, 0.03])
    aiofranka.lock()
+
+tool
+----
+
+Identify the tool on the flange and keep it as an end-effector profile in Desk (Settings > End
+Effector), the same profiles the web UI shows. The robot compensates the active profile, and
+``RobotInterface`` merges it into the MuJoCo model when it connects.
+
+.. code-block:: bash
+
+   aiofranka tool identify gripper   # move through 16 poses, save as profile "gripper", activate it
+   aiofranka tool load gripper       # activate a profile
+   aiofranka tool unload             # activate the built-in "No End Effector" profile
+   aiofranka tool list               # list the profiles, marking the active one
+   aiofranka tool remove gripper     # delete a profile
+
+``tool identify`` unlocks the robot like ``aiofranka home`` and plans the poses around the current
+one, so move the arm to an open pose first. Describe the tool for the collision checks with
+``--tool-length`` and ``--tool-radius`` (default 0.2 m and 0.1 m), and the table with ``--floor``
+(default 0, the mounting plane; the robot keeps 5 cm from it). It shows the estimate and
+asks before saving it, offering to edit the mass (in g) and the center of mass (in mm), e.g. to use
+a scale reading; an existing profile keeps its tool center point and inertia. ``--no-load`` saves
+it without activating it. See :ref:`payload-identification`.
+
+From Python:
+
+.. code-block:: python
+
+   import aiofranka
+   aiofranka.save_tool("gripper", mass=0.62, com=[0.0, 0.0, 0.045])
+   aiofranka.load_tool("gripper")
+   aiofranka.list_tools()
 
 selftest
 --------
