@@ -140,7 +140,8 @@ aiofranka home     [--ip IP]              Move the robot to its home pose
 aiofranka status   [--ip IP]              Show robot & server status
 aiofranka stop     [--ip IP]              Stop a running server
 aiofranka mode     [--ip IP] [--set MODE] View/change operating mode
-aiofranka config   [--ip IP] [--mass M]   View/set end-effector config
+aiofranka config   [--ip IP] [--mass M]   View/set the active end-effector profile
+aiofranka tool     identify|load|unload|list|remove   Identify and switch tools
 aiofranka selftest [--ip IP] [--force]    Run safety self-tests
 aiofranka log      [-n LINES] [-f]        View server logs
 aiofranka gripper  --open|--close          Control the Robotiq gripper
@@ -179,7 +180,7 @@ aiofranka gravcomp --damping 2.0    # add velocity damping
 
 ### `status`
 
-Shows robot state (joints locked/unlocked, FCI active/inactive, control token, self-test status, end-effector configuration) and server status if running.
+Shows robot state (joints locked/unlocked, FCI active/inactive, control token, self-test status, the active end-effector profile) and server status if running.
 
 ```bash
 aiofranka status
@@ -204,12 +205,36 @@ aiofranka mode --set Execution  # switch to FCI mode
 
 ### `config`
 
-View or set the end-effector configuration (mass, center of mass, inertia, flange-to-EE transform). Changes are applied via the Franka Desk API.
+View or set the end-effector configuration (mass, center of mass, inertia, flange-to-EE transform). Changes are applied via the Franka Desk API to the active end-effector profile; to keep several tools by name, use `aiofranka tool`.
 
 ```bash
 aiofranka config                                # view current config
 aiofranka config --mass 0.5 --com 0,0,0.03      # set mass + CoM
 aiofranka config --translation 0,0,0.1           # set flange-to-EE offset
+```
+
+### `tool`
+
+Desk keeps named end-effector profiles (Settings > End Effector): the mass, center of mass and inertia of the tool on the flange. The robot compensates the gravity of the active profile, and aiofranka merges it into the MuJoCo model when it connects, so the OSC's mass matrix includes the tool too.
+
+```bash
+aiofranka tool identify gripper   # identify the mounted tool, save it as profile "gripper", activate it
+aiofranka tool load gripper       # activate a profile when its tool is mounted
+aiofranka tool unload             # activate the built-in "No End Effector" profile
+aiofranka tool list               # list the profiles, marking the active one
+aiofranka tool remove gripper     # delete a profile
+```
+
+`tool identify` moves the robot through 16 poses around the current one (about 3 minutes), approaching each from both sides to cancel joint stiction, and fits the mass and center of mass to the joint torques at rest. Start in an open pose and keep a hand on the e-stop. The poses are checked for collisions of the arm, a cylinder around the tool (`--tool-length`, `--tool-radius`, default 0.2 m by 0.1 m) and the floor (`--floor`, default the mounting plane). It shows the estimate and asks before saving it, offering to edit the mass and center of mass, e.g. to enter a scale reading.
+
+The inertia and the TCP cannot be identified this way; set them in the Desk web UI if needed. Tools lighter than about 200 g are better weighed: the center of mass then comes out only to about a centimeter.
+
+From Python (async mode):
+
+```python
+estimate = await controller.identify_payload(tool_length=0.2)   # moves the robot
+aiofranka.save_tool("gripper", estimate.mass, estimate.com)
+aiofranka.load_tool("gripper")
 ```
 
 ### `selftest`
@@ -311,6 +336,17 @@ desired_ee = np.eye(4)  # 4x4 homogeneous transform
 desired_ee[:3, 3] = [0.4, 0.0, 0.5]  # Position
 controller.set("ee_desired", desired_ee)
 ```
+
+By default, the OSC controls the flange. To control a point on the tool instead, set the tool center point (TCP) as a translation or a 4x4 pose in the flange frame (async mode, `FrankaController`):
+
+```python
+controller.switch("osc")
+controller.set_tcp([0, 0, 0.1034])  # e.g. the Franka Hand fingertips; the arm holds still
+```
+
+The flange frame has its origin at the center of the flange face and z pointing out of it (x red, y green, z blue; right: a TCP 10 cm along z):
+
+![The flange frame of the FR3](docs/source/images/flange_frame.png)
 
 **Use case**: Cartesian trajectories, end-effector tracking
 
