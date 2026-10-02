@@ -149,6 +149,10 @@ class FrankaController:
 
         self.state = None 
 
+        # move() is done, and activate() takes an OSC configuration's null-space target,
+        # when every joint is this close to its target [rad].
+        self.arrival_tolerance = 0.03
+
         self.verbose = False
 
 
@@ -551,16 +555,24 @@ class FrankaController:
         raise RuntimeError(f"The configuration needs the tool {name!r}, but the end effector active in Desk "
                            f"is {active.name!r}. Activate it with: {fix} (then reconnect)")
 
-    def activate(self, config, check_tool=True):
+    def activate(self, config, check_tool=True, check_null_target=True):
         """
         Apply a controller configuration: its mode, gains and policy rate.
 
         For impedance it sets kp and kd; for osc the TCP, ee_kp, ee_kd, null_kp,
         null_kd and the null-space target. It then sets the rate of set() to the
         configuration's frequency. Like switch(), it holds the current joint positions
-        (impedance) or TCP pose (osc); with osc, the null space then pulls the joints
-        toward the null-space target (home by default) while the TCP holds still. See
-        aiofranka.config for the file format.
+        (impedance) or TCP pose (osc). See aiofranka.config for the file format.
+
+        An OSC configuration without a null_target keeps the joint positions at
+        activation as the null-space target, as switch() does. One with a null_target
+        (e.g. a policy's) is only activated with the arm already there, every joint
+        within arrival_tolerance, the criterion move() stops at; otherwise the null
+        space would swing the arm toward it at once. Move there first:
+
+            >>> config = aiofranka.load_config("configs/pocky/lv1_osc.yaml")
+            >>> await controller.move(config["null_target"])
+            >>> controller.activate(config)
 
         Reading a file takes a few milliseconds, which delays the 1 kHz loop that
         long; while it runs, pass a configuration read before with
@@ -570,13 +582,18 @@ class FrankaController:
             config (str | Path | dict): YAML file, or its contents
             check_tool (bool): Refuse a configuration whose tool is not the end
                 effector active in Desk (see check_tool())
+            check_null_target (bool): Refuse an OSC configuration whose null_target
+                the arm is not at. Only skip it where the null space is known to be at
+                rest, e.g. at a pose where the TCP Jacobian's null space holds no
+                error toward the target.
 
         Returns:
             dict: The configuration, as aiofranka.load_config() reads it
 
         Raises:
             ValueError: If the configuration is not valid
-            RuntimeError: If its tool is not the one active in Desk
+            RuntimeError: If its tool is not the one active in Desk, or the arm is
+                not at its null_target
 
         Example:
             >>> controller.activate("configs/osc.yaml")
@@ -587,6 +604,14 @@ class FrankaController:
         config = load_config(config)
         if check_tool:
             self.check_tool(config)
+        if config["mode"] == "osc" and config["null_target"] is not None and check_null_target:
+            error = np.abs(np.array(self.robot.data.qpos[:7]) - config["null_target"])
+            if error.max() > self.arrival_tolerance:
+                raise RuntimeError(
+                    f"The arm is {error.max():.3f} rad from the configuration's null_target at joint "
+                    f"{error.argmax() + 1} (more than arrival_tolerance, {self.arrival_tolerance} rad), so the "
+                    "null space would swing it there. Move there first: "
+                    "await controller.move(config['null_target'])")
         if config["mode"] == "osc":
             self.set_tcp(config["tcp"])
         self.switch(config["mode"])
@@ -596,7 +621,8 @@ class FrankaController:
             else:
                 self.ee_kp, self.ee_kd = config["ee_kp"].copy(), config["ee_kd"].copy()
                 self.null_kp, self.null_kd = config["null_kp"].copy(), config["null_kd"].copy()
-                self.initial_qpos = config["null_target"].copy()  # the OSC's null-space target
+                if config["null_target"] is not None:  # else the joint positions now, as switch() sets
+                    self.initial_qpos = config["null_target"].copy()  # the OSC's null-space target
         self.set_freq(config["frequency"])
         return config
 
@@ -802,18 +828,23 @@ class FrankaController:
         Caveats:
             - Large motions take longer (trajectory is time-optimal)
             - Don't call while other control is active
-            - Blocks until motion completes
+            - Blocks until motion completes: until every joint is within
+              arrival_tolerance (0.03 rad by default) of the target, or 3 s after the
+              trajectory if friction keeps it farther (it then prints how far)
             - Switches to impedance mode (resets controller state)
             - May fail if target is at joint limits or in collision
         """
         self.type = "impedance"
+        target = np.array(qpos, dtype=float)
 
         inp = InputParameter(7)
-        inp.current_position = self.robot.state['qpos']
-        inp.current_velocity = self.robot.state['qvel']
+        # The state the control loop synced last; reading the robot here would take a
+        # state from the 1 kHz loop.
+        inp.current_position = np.array(self.robot.data.qpos[:7])
+        inp.current_velocity = np.array(self.robot.data.qvel[:7])
         inp.current_acceleration = np.zeros(7)
 
-        inp.target_position = np.array(qpos)
+        inp.target_position = target
         inp.target_velocity = np.zeros(7)
         inp.target_acceleration = np.zeros(7)
 
@@ -845,7 +876,16 @@ class FrankaController:
             self._last_update_time.pop("q_desired", None)
         print()
 
-        # await self.stabilize()
+        # Then hold the exact target until every joint is within arrival_tolerance of it.
+        with self.state_lock:
+            self.q_desired = target.copy()
+        deadline = time.perf_counter() + 3.0
+        while (error := np.abs(np.array(self.robot.data.qpos[:7]) - target).max()) > self.arrival_tolerance:
+            if time.perf_counter() > deadline:
+                print(f"  move(): still {error:.3f} rad from the target, more than arrival_tolerance "
+                      f"({self.arrival_tolerance} rad); a stiffer kp gets closer")
+                break
+            await asyncio.sleep(0.01)
 
     async def identify_payload(self, tool_length=0.2, tool_radius=0.1, floor=0.0, **kwargs):
         """

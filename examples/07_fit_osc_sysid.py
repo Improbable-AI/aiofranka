@@ -24,10 +24,13 @@ each an RMS over the window samples (the joints per joint). The windows at one p
 held out to check the fit.
 
     pip install mjbatch   # batched MuJoCo; it pins its own mujoco version
+    python examples/07_fit_osc_sysid.py --activate configs/<name>.yaml --physics_dt 0.002
     python examples/07_fit_osc_sysid.py --traj examples/sysid_data/osc_sysid_<date>.npz --physics_dt 0.002
 
-Adds the fit to the sim section of the configuration the recording was collected with
-(or --activate), as the entry for this physics_dt (see aiofranka.config).
+With --activate, it fits the configuration's latest recording (06_collect_osc_sysid.py lists the
+complete recordings it makes on the robot there); with --traj, that recording. It adds the
+fit to the sim section of the configuration the recording was collected with (or
+--activate), as the entry for this physics_dt (see aiofranka.config).
 """
 
 from __future__ import annotations
@@ -43,7 +46,7 @@ import mujoco
 import numpy as np
 from mjbatch import Batch
 
-from aiofranka.config import load_config, same_controller, save_sim
+from aiofranka.config import latest_recording, load_config, same_controller, save_sim
 from aiofranka.payload import MODEL_PATH
 from aiofranka.robot import link_inertial, merge_payload
 
@@ -67,13 +70,16 @@ class Run:
             setattr(self, key, data[key])
         self.block = data["block"].astype(int)
         self.gains = {}
-        for name in GAINS + ("null_target", "rate_hz"):
+        for name in GAINS + ("rate_hz",):
             values = data[name]
             if len(np.unique(values, axis=0)) > 1:
                 raise ValueError(f"The recording has several values of {name}; record one setting per file")
             self.gains[name] = values[0].astype(float)
         self.hz = int(self.gains.pop("rate_hz"))
-        self.null_target = self.gains.pop("null_target")
+        # Each block's null-space target: the configuration's, or the posture the block started in.
+        self.null_targets = data["null_target"].astype(float)
+        played = self.null_targets[np.unique(self.block)]
+        self.null_target = played[0] if len(np.unique(played, axis=0)) == 1 else None
         self.torque_limit = np.array(self.meta["torque_limit"])
         self.rate_limit = self.meta["torque_rate_limit"]
         self.payload = self.meta["load"]["payload"]
@@ -204,6 +210,7 @@ class Simulator:
         ticks = np.tile(starts, count_params)
         fields["qpos"][:] = run.q[ticks]
         fields["qvel"][:] = run.dq[ticks]
+        per_sim["null_target"] = run.null_targets[run.block[ticks]]
         batch.forward()
         return batch, fields, per_sim, ticks
 
@@ -230,7 +237,7 @@ class Simulator:
         for step in range(length // self.period):
             goal = run.ee_des[ticks + step * self.period]  # the policy's action, held for the step
             for _ in range(self.decimation):
-                tau = self.torque(fields, goal, per_sim, run.null_target, per_sim["armature"], previous)
+                tau = self.torque(fields, goal, per_sim, per_sim["null_target"], per_sim["armature"], previous)
                 fields["ctrl"][:] = tau
                 previous = tau
                 batch.step()
@@ -253,7 +260,7 @@ class Simulator:
         batch, fields, per_sim, _ = self._load({k: v[None] for k, v in start.items()}, ticks)
         saved, self.physics_dt = self.physics_dt, 1.0 / CONTROL_HZ  # the robot's rate limit per tick
         try:
-            tau = self.torque(fields, run.ee_des[ticks], per_sim, run.null_target, per_sim["armature"],
+            tau = self.torque(fields, run.ee_des[ticks], per_sim, per_sim["null_target"], per_sim["armature"],
                               run.tau_J_d[ticks])
         finally:
             self.physics_dt = saved
@@ -392,7 +399,8 @@ def configuration(run, path):
     path = Path(path)
     config = load_config(path)
     recorded = run.meta.get("config") or {
-        "mode": "osc", "frequency": run.hz, "null_target": run.null_target.tolist(), "tcp": run.tcp.tolist(),
+        "mode": "osc", "frequency": run.hz, "tcp": run.tcp.tolist(),
+        "null_target": "current" if run.null_target is None else run.null_target.tolist(),
         "tool": config.get("tool"), **{name: run.gains[name].tolist() for name in GAINS}}
     if not same_controller(config, recorded):
         raise ValueError(f"{path} no longer describes the controller of the recording")
@@ -402,9 +410,10 @@ def configuration(run, path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[1].replace("\n", " "),
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--traj", type=Path, required=True, help="Recording of 06_collect_osc_sysid.py")
     parser.add_argument("--activate", type=Path,
-                        help="Configuration to add the fit to (default: the one the recording was collected with)")
+                        help="Configuration: fit its latest recording (without --traj) and add the fit to it")
+    parser.add_argument("--traj", type=Path,
+                        help="Recording of 06_collect_osc_sysid.py to fit (default: the latest of --activate)")
     parser.add_argument("--physics_dt", "--physics-dt", type=float, required=True,
                         help="Physics step of your simulation [s], a whole number of ms dividing the policy period")
     parser.add_argument("--mass_matrix", "--mass-matrix", choices=("nominal", "plant"), default="nominal",
@@ -423,6 +432,17 @@ def main():
     parser.add_argument("--threads", type=int, default=0, help="Simulation threads (0: all CPUs)")
     args = parser.parse_args()
 
+    if args.traj is None:
+        if args.activate is None:
+            parser.error("pass --activate (its latest recording is fitted) or --traj")
+        try:
+            args.traj = latest_recording(args.activate)
+        except (OSError, ValueError) as problem:
+            parser.error(str(problem))
+        if args.traj is None:
+            parser.error(f"{args.activate} lists no recordings yet: collect with "
+                         f"06_collect_osc_sysid.py --activate {args.activate}, or pass --traj")
+        print(f"\n  The latest recording of {args.activate}: {args.traj}")
     try:
         run = Run(args.traj)
         config_path, recorded_controller = configuration(run, args.activate)
@@ -441,7 +461,7 @@ def main():
     print(f"  Tool {run.meta.get('tool') or '(not read from Desk)'}: the model, and the OSC's mass matrix, carry the payload the robot "
           f"compensated, {run.payload['mass']:.3f} kg at {np.round(run.payload['com'], 4).tolist()} m")
     print("  " + ", ".join(f"{name} {run.gains[name].tolist()}" for name in GAINS))
-    print(f"  null target {run.null_target.tolist()}")
+    print(f"  null target {'the posture each block started in' if run.null_target is None else run.null_target.tolist()}")
     print(f"  Replay check: max |recomputed - sent torque| = {sim.replay_error():.1e} Nm")
     print(f"  physics_dt {args.physics_dt * 1000:g} ms, decimation {sim.decimation}, {args.mass_matrix} mass matrix; "
           f"fitting {len(train)} windows of {length / CONTROL_HZ:g} s, holding out {len(test)} at {holdout}\n")

@@ -43,7 +43,7 @@ import mujoco.viewer
 import numpy as np
 
 from aiofranka import FrankaController, RobotInterface
-from aiofranka.config import load_config, to_yaml
+from aiofranka.config import add_recording, load_config, to_yaml
 from aiofranka.payload import MODEL_PATH, _closest, _collision_model, _is_clear
 
 CONTROL_HZ = 1000
@@ -474,6 +474,10 @@ async def main() -> int:
     controller.setup(total)
     stamp = datetime.datetime.now()
     path = args.out / f"joint_sysid_{stamp:%Y%m%d_%H%M%S}{'' if robot.real else '_sim'}.npz"
+    for suffix in range(2, 100):  # never overwrite another recording
+        if not path.exists():
+            break
+        path = path.with_name(f"{path.stem.rsplit('-', 1)[0]}-{suffix}.npz")
     meta = {
         "format": "aiofranka-sysid-2",
         "controller": "impedance",
@@ -517,6 +521,15 @@ async def main() -> int:
         status = status or 1
     print(f"\n  Saved {path}")
     summarize(path)
+    if robot.real and status == 0:
+        # A complete recording from the robot: list it in the configuration, where the fit finds it.
+        try:
+            add_recording(args.activate, {"path": path, "date": meta["date"], "tool": meta["tool"]},
+                          controller=args.config)
+            print(f"\n  Added it to the recordings of {args.activate}; fit it with:\n"
+                  f"    python examples/05_fit_joint_sysid.py --activate {args.activate} --physics_dt <s>")
+        except (OSError, ValueError, RuntimeError) as error:
+            print(f"\n  Could not add it to {args.activate}: {error}")
     print()
     return status
 

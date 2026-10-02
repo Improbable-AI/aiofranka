@@ -13,10 +13,13 @@ measured joint positions, replaying 2 s windows from the measured state at their
 The windows at one pose are held out to check the fit.
 
     pip install mjbatch   # batched MuJoCo; it pins its own mujoco version
+    python examples/05_fit_joint_sysid.py --activate configs/<name>.yaml --physics_dt 0.002
     python examples/05_fit_joint_sysid.py --traj examples/sysid_data/joint_sysid_<date>.npz --physics_dt 0.002
 
-Adds the fit to the sim section of the configuration the recording was collected with
-(or --activate), as the entry for this physics_dt (see aiofranka.config). kd and joint
+With --activate, it fits the configuration's latest recording (04_collect_joint_sysid.py lists the
+complete recordings it makes on the robot there); with --traj, that recording. It adds the
+fit to the sim section of the configuration the recording was collected with (or
+--activate), as the entry for this physics_dt (see aiofranka.config). kd and joint
 damping both damp the joint velocity, so mostly their sum is determined; the fit reports both.
 """
 
@@ -33,7 +36,7 @@ import mujoco
 import numpy as np
 from mjbatch import Batch
 
-from aiofranka.config import load_config, same_controller, save_sim
+from aiofranka.config import latest_recording, load_config, same_controller, save_sim
 from aiofranka.payload import MODEL_PATH
 from aiofranka.robot import link_inertial, merge_payload
 
@@ -282,9 +285,10 @@ def configuration(run, path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[1].replace("\n", " "),
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--traj", type=Path, required=True, help="Recording of 04_collect_joint_sysid.py")
     parser.add_argument("--activate", type=Path,
-                        help="Configuration to add the fit to (default: the one the recording was collected with)")
+                        help="Configuration: fit its latest recording (without --traj) and add the fit to it")
+    parser.add_argument("--traj", type=Path,
+                        help="Recording of 04_collect_joint_sysid.py to fit (default: the latest of --activate)")
     parser.add_argument("--physics_dt", "--physics-dt", type=float, required=True,
                         help="Physics step of your simulation [s], a whole number of ms dividing the policy period")
     parser.add_argument("--holdout", default="last",
@@ -297,6 +301,17 @@ def main():
     parser.add_argument("--threads", type=int, default=0, help="Simulation threads (0: all CPUs)")
     args = parser.parse_args()
 
+    if args.traj is None:
+        if args.activate is None:
+            parser.error("pass --activate (its latest recording is fitted) or --traj")
+        try:
+            args.traj = latest_recording(args.activate)
+        except (OSError, ValueError) as problem:
+            parser.error(str(problem))
+        if args.traj is None:
+            parser.error(f"{args.activate} lists no recordings yet: collect with "
+                         f"04_collect_joint_sysid.py --activate {args.activate}, or pass --traj")
+        print(f"\n  The latest recording of {args.activate}: {args.traj}")
     try:
         run = Run(args.traj)
         config_path, recorded_controller = configuration(run, args.activate)

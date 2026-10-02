@@ -275,7 +275,6 @@ and ``set_freq()``:
    ee_kd: 20
    null_kp: 9                 # one value, or one per joint (default 1)
    null_kd: 6                 # (default 1)
-   null_target: home          # 7 joint positions [rad], or home (the default)
    tcp: [0, 0, 0]             # TCP in the flange frame: a translation [m] or a 4x4 pose
    frequency: 50              # policy rate [Hz]
 
@@ -287,8 +286,21 @@ and ``set_freq()``:
    controller.switch("osc")
    controller.ee_kp, controller.ee_kd = np.ones(6) * 100.0, np.ones(6) * 20.0
    controller.null_kp, controller.null_kd = np.ones(7) * 9.0, np.ones(7) * 6.0
-   controller.initial_qpos = aiofranka.config.HOME.copy()
    controller.set_freq(50)
+
+Without a ``null_target``, the null space keeps the joint positions at activation, as ``switch()``
+does, so activating moves nothing. A policy trained with a fixed posture names it, as 7 joint
+positions or ``home``. Then ``activate()`` only applies the configuration with the arm already
+there, every joint within ``controller.arrival_tolerance`` (0.03 rad), the same criterion
+``move()`` stops at; otherwise the null space would swing the arm toward the target at once (in
+MuJoCo, a configuration whose target was 1.6 rad away swung joint 1 at 4.6 rad/s). Move there
+first:
+
+.. code-block:: python
+
+   config = aiofranka.load_config("configs/pocky/lv1_osc.yaml")
+   await controller.move(config["null_target"])  # also puts the TCP where the policy starts
+   controller.activate(config)
 
 A joint impedance file has ``mode: impedance``, ``kp`` and ``kd``. The ``configs/`` folder of the
 repository has examples. ``aiofranka.load_config()`` reads and checks a file; unknown keys are an
@@ -302,8 +314,9 @@ the profile, reconnect. If Desk cannot be read, ``activate()`` refuses too; pass
 MuJoCo there is no Desk and nothing is checked. ``RobotInterface(ip, read_tool=False)`` does not read
 Desk; the server does not.
 
-The system identification examples collect with a configuration (``--activate``) and add what they
-fit to its ``sim`` section, one entry per physics step: the gains and joint parameters with which a
+The system identification examples collect with a configuration (``--activate``), list each
+complete recording from the robot in its ``recordings`` section, fit the latest by default, and add
+what they fit to its ``sim`` section, one entry per physics step: the gains and joint parameters with which a
 simulation that runs the controller every physics step responds as the robot did, with the payload
 the fit assumed (merged into ``fr3_link7`` by ``aiofranka.robot.merge_payload()``) and where the
 data came from (``plant``: robot or mujoco). Read one with

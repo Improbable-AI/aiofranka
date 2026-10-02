@@ -19,9 +19,14 @@ examples/sysid_data/osc_sysid_<date>.npz.
 Add --plan to check the plan and exit. It refuses to move if the configuration's tool is
 not the end effector active in Desk; 07_fit_osc_sysid.py adds its fit to the same file.
 Each block starts at its base joint pose with joint impedance, applies the configuration
-with controller.activate() and waits 1 s for the null space to settle toward the null
-target, then plays. Before moving, every target is solved with inverse kinematics (biased
-toward the null target, as the OSC's null space is) and checked for 5 cm of clearance
+with controller.activate() and waits 1 s, then plays. Without a null_target in the
+configuration, the base poses are home, left and right, and each block's null-space
+target is the posture it starts in, as activate() keeps it. With one (e.g. a policy's),
+the base poses are on its branch, with the TCP where the null target puts it, moved 15 cm
+toward 0.4 m height (up from a pose near a table) and 12 cm to either side, where the null space is at rest, so activating swings nothing; the
+collector checks that before each block. Before moving, every target is solved with
+inverse kinematics (biased toward the null target, as the OSC's null space is) and
+checked for 5 cm of clearance
 between the arm, a cylinder around the tool and the floor and for 0.1 rad from the joint
 limits, and so is every move between poses. While playing, only the robot's own limits
 apply: past its joint position, velocity or torque limits its reflexes stop it, and the
@@ -46,7 +51,7 @@ import mujoco.viewer
 import numpy as np
 
 from aiofranka import FrankaController, RobotInterface
-from aiofranka.config import load_config, to_yaml
+from aiofranka.config import add_recording, load_config, to_yaml
 from aiofranka.payload import MODEL_PATH, _closest, _collision_model, _is_clear
 
 CONTROL_HZ = 1000
@@ -55,6 +60,15 @@ POSES = {
     "left": [0.6, -0.3, 0.2, -2.2, 0.0, 1.9, -0.2],
     "right": [-0.6, 0.2, -0.2, -1.6, 0.0, 1.8, -1.4],
 }
+# With a null_target: the TCP's offsets from where the null target puts it, in the base frame [m],
+# and NULL_RISE toward NULL_HEIGHT: up from a pose near a table, down from a high one.
+NULL_POSES = {
+    "center": [0.0, 0.0],
+    "left": [0.0, 0.12],
+    "right": [0.0, -0.12],
+}
+NULL_RISE, NULL_HEIGHT = 0.15, 0.4  # m
+NULL_REST_TOLERANCE = 0.05  # rad of null-space error toward the null target allowed at a base pose
 
 # Gains for moving between poses and for holding after a stop.
 MOVE_KP = np.array([80.0] * 4 + [48.0] * 3)
@@ -199,8 +213,40 @@ def ik(model, data, site, target, q, q_null, iterations=10, null_gain=0.05):
     return q, np.linalg.norm(error[:3]), np.linalg.norm(error[3:])
 
 
+def null_branch_poses(names, tcp, q_null, model, data):
+    """
+    Joint poses on the null target's branch with the TCP at NULL_POSES offsets from where
+    the null target puts it and NULL_RISE closer to NULL_HEIGHT, the TCP's orientation
+    kept: where the null space is at rest.
+    Returns the poses and the problems, if any.
+    """
+    site = model.site("attachment_site").id
+    start = site_pose(model, data, site, q_null) @ tcp
+    rise = NULL_RISE if start[2, 3] < NULL_HEIGHT else -NULL_RISE
+    poses, problems = {}, []
+    for name in names:
+        target = start.copy()
+        target[:3, 3] += [*NULL_POSES[name], rise]
+        q, position_error, rotation_error = ik(model, data, site, target @ np.linalg.inv(tcp), q_null, q_null,
+                                               iterations=300)
+        if position_error > 1e-4 or rotation_error > 1e-3:
+            problems.append(f"{name}: the TCP {np.round(target[:3, 3], 3).tolist()} is out of reach")
+        poses[name] = q
+    return poses, problems
+
+
+def null_space_error(jac, rotation, tcp, q, q_null):
+    """The largest error toward q_null that the null space of the TCP Jacobian would move the joints by [rad]."""
+    jac = np.array(jac)
+    jac[:3] += np.cross(jac[3:].T, rotation @ tcp[:3, 3]).T  # the TCP's Jacobian
+    return np.abs((np.eye(7) - np.linalg.pinv(jac) @ jac) @ (q_null - q)).max()
+
+
 def check(blocks, poses, tcp, q_null, model, data, clearance):
-    """Problems with the targets and the moves between poses, if any."""
+    """
+    Problems with the targets and the moves between poses, if any. q_null is the
+    null-space target, or None for the posture at each base pose.
+    """
     problems = []
     site = model.site("attachment_site").id
     lower = model.jnt_range[:7, 0] + PLAN_LIMIT_MARGIN
@@ -209,14 +255,23 @@ def check(blocks, poses, tcp, q_null, model, data, clearance):
     for pose, q0 in poses.items():
         base = site_pose(model, data, site, q0) @ tcp
         # Where the null space settles while the OSC holds the base pose.
-        q_base, _, _ = ik(model, data, site, base @ flange_from_tcp, q0, q_null, iterations=300)
+        target_q = q0 if q_null is None else q_null
+        q_base, _, _ = ik(model, data, site, base @ flange_from_tcp, q0, target_q, iterations=300)
+        if q_null is not None:
+            site_pose(model, data, site, q0)
+            mujoco.mj_comPos(model, data)
+            jac = np.zeros((6, model.nv))
+            mujoco.mj_jacSite(model, data, jac[:3], jac[3:], site)
+            rest = null_space_error(jac[:, :7], data.site_xmat[site].reshape(3, 3), tcp, q0, q_null)
+            if rest > NULL_REST_TOLERANCE:
+                problems.append(f"{pose}: the null space is not at rest there ({rest:.2f} rad toward the null target)")
         targets = np.concatenate([b.offsets for b in blocks if b.pose == pose])
         changes = np.ones(len(targets), bool)
         changes[1:] = np.any(targets[1:] != targets[:-1], axis=1)
         q = q_base
         for offset in targets[changes]:
             target = apply(base, offset[None])[0] @ flange_from_tcp
-            q, position_error, rotation_error = ik(model, data, site, target, q, q_null)
+            q, position_error, rotation_error = ik(model, data, site, target, q, target_q)
             if position_error > 1e-3 or rotation_error > 5e-3:
                 problems.append(f"{pose}: a target is out of reach (offset {np.round(offset, 3).tolist()})")
                 break
@@ -243,10 +298,11 @@ def path_clear(model, data, start, end, step=0.02):
 class Collector(FrankaController):
     """OSC that plays a block's TCP targets tick by tick and records each tick."""
 
-    def setup(self, capacity):
+    def setup(self, capacity, blocks):
         self.playing = False
         self.abort_reason = None
         self.count = 0
+        self.null_targets = np.full((blocks, 7), np.nan)  # each block's null-space target, as activated
         vector = lambda: np.zeros((capacity, 7))  # noqa: E731
         self.log = {
             "time": np.zeros(capacity),
@@ -332,6 +388,7 @@ async def move_to(controller, target):
 
 async def collect(controller, blocks, poses, config):
     started = time.perf_counter()
+    q_null = config["null_target"]
     for index, block in enumerate(blocks):
         print(f"  [{index + 1}/{len(blocks)}] {block.pose}   ({(time.perf_counter() - started) / 60:.1f} min, "
               f"{sum(len(b.offsets) for b in blocks[index:]) / CONTROL_HZ / 60:.1f} min of blocks left)")
@@ -340,7 +397,19 @@ async def collect(controller, blocks, poses, config):
         await asyncio.sleep(SETTLE)
         if controller.abort_reason is not None:
             return
-        controller.activate(config, check_tool=False)  # holds the current TCP pose; tool checked before moving
+        if q_null is None:
+            controller.activate(config, check_tool=False)  # tool checked before moving
+        else:
+            # The base poses are where the null space is at rest: check, then activate there
+            # although the arm is not at the null target.
+            state = controller.state
+            rest = null_space_error(state["jac"], state["ee"][:3, :3], config["tcp"], state["qpos"], q_null)
+            if rest > NULL_REST_TOLERANCE:
+                controller._abort(f"the null space is not at rest at {block.pose} "
+                                  f"({rest:.2f} rad toward the null target)")
+                return
+            controller.activate(config, check_tool=False, check_null_target=False)
+        controller.null_targets[index] = controller.initial_qpos[:7]
         await asyncio.sleep(SETTLE)
         if controller.abort_reason is not None:
             return
@@ -384,12 +453,14 @@ def robot_load(robot):
 
 
 def save(path, controller, blocks, poses, gains, rate, meta):
+    """Save the log; gains holds the per-block values that are the same for all blocks."""
     n = controller.count
     arrays = {key: value[:n] for key, value in controller.log.items()}
     pose_names = list(poses)
     count = len(blocks)
     arrays.update({name: np.tile(value, (count, 1)) for name, value in gains.items()})
     arrays.update(
+        null_target=controller.null_targets,  # NaN for blocks not reached
         rate_hz=np.full(count, rate),
         pose=np.array([pose_names.index(b.pose) for b in blocks]),
         poses=np.array(list(poses.values())),
@@ -446,7 +517,8 @@ def parse_args():
     parser.add_argument("--no-check-tool", action="store_true",
                         help="Collect even if Desk's active end effector is not the configuration's tool "
                              "or cannot be read")
-    parser.add_argument("--poses", nargs="+", default=list(POSES), choices=list(POSES), help="Base poses")
+    parser.add_argument("--poses", nargs="+",
+                        help=f"Base poses: of {list(POSES)}, or with a null_target of {list(NULL_POSES)} (default: all)")
     parser.add_argument("--repeats", type=int, default=2, help="Blocks at each pose")
     parser.add_argument("--seed", type=int, default=0, help="Seed of the step offsets")
     parser.add_argument("--tool-length", type=float, default=0.2,
@@ -480,25 +552,37 @@ def parse_args():
 
 async def main() -> int:
     args = parse_args()
-    poses = {name: np.array(POSES[name]) for name in args.poses}
-    gains = {"ee_kp": args.ee_kp, "ee_kd": args.ee_kd, "null_kp": args.null_kp, "null_kd": args.null_kd,
-             "null_target": args.null_target}
+    model, data = _collision_model(args.tool_length, args.tool_radius, args.floor, args.clearance)
+    names = list(POSES if args.null_target is None else NULL_POSES)
+    for name in args.poses or []:
+        if name not in names:
+            print(f"\n  --poses takes {names} with this configuration, not {name}\n")
+            return 1
+    names = args.poses or names
+    if args.null_target is None:
+        poses, problems = {name: np.array(POSES[name]) for name in names}, []
+    else:
+        poses, problems = null_branch_poses(names, args.tcp, args.null_target, model, data)
+    gains = {"ee_kp": args.ee_kp, "ee_kd": args.ee_kd, "null_kp": args.null_kp, "null_kd": args.null_kd}
     blocks, size = plan(poses, args.ee_kp, args.hz, args.repeats, args.seed)
 
-    model, data = _collision_model(args.tool_length, args.tool_radius, args.floor, args.clearance)
-    problems = check(blocks, poses, args.tcp, args.null_target, model, data, args.clearance)
+    problems += check(blocks, poses, args.tcp, args.null_target, model, data, args.clearance)
     total = sum(len(b.offsets) for b in blocks)
     moves = len(blocks) * (2 * SETTLE + 1.0) + sum(
         max(1.875 * np.abs(poses[a] - poses[b]).max() / MOVE_SPEED, 0.5)
         for a, b in zip(list(poses), list(poses)[1:] + list(poses)[:1]) if a != b)
     print(f"\n  {args.activate}: ee_kp {args.ee_kp.tolist()}, ee_kd {args.ee_kd.tolist()}, "
           f"tool {args.config.get('tool', 'not set')}")
-    print(f"  null_kp {args.null_kp.tolist()}, null_kd {args.null_kd.tolist()}, "
-          f"null target {args.null_target.tolist()}")
+    null_target = "the posture at each base pose" if args.null_target is None else args.null_target.tolist()
+    print(f"  null_kp {args.null_kp.tolist()}, null_kd {args.null_kd.tolist()}, null target {null_target}")
     print(f"  TCP translation {args.tcp[:3, 3].tolist()} m, targets at {args.hz} Hz")
     print(f"  {len(blocks)} blocks, {args.repeats} at each of {', '.join(poses)}: about "
           f"{(total / CONTROL_HZ + moves) / 60:.1f} min, {total * 580 / 1e6:.0f} MB")
     print(f"  Offsets up to {1000 * size[:3].max():.0f} mm and {1000 * size[3:].max():.0f} mrad")
+    site = model.site("attachment_site").id
+    for name, q in poses.items():
+        tcp_at = (site_pose(model, data, site, q) @ args.tcp)[:3, 3]
+        print(f"  {name}: TCP at {np.round(tcp_at, 3).tolist()} m, joints {np.round(q, 3).tolist()}")
     if problems:
         print("\n  Not safe to run:")
         for problem in problems:
@@ -532,10 +616,14 @@ async def main() -> int:
         except RuntimeError as error:
             print(f"\n  {error} Here: --no-check-tool.\n")
             return 1
-    controller.setup(total)
+    controller.setup(total, len(blocks))
     controller.set_tcp(args.tcp)
     stamp = datetime.datetime.now()
     path = args.out / f"osc_sysid_{stamp:%Y%m%d_%H%M%S}{'' if robot.real else '_sim'}.npz"
+    for suffix in range(2, 100):  # never overwrite another recording
+        if not path.exists():
+            break
+        path = path.with_name(f"{path.stem.rsplit('-', 1)[0]}-{suffix}.npz")
     meta = {
         "format": "aiofranka-sysid-2",
         "controller": "osc",
@@ -580,6 +668,15 @@ async def main() -> int:
         status = status or 1
     print(f"\n  Saved {path}")
     summarize(path)
+    if robot.real and status == 0:
+        # A complete recording from the robot: list it in the configuration, where the fit finds it.
+        try:
+            add_recording(args.activate, {"path": path, "date": meta["date"], "tool": meta["tool"]},
+                          controller=args.config)
+            print(f"\n  Added it to the recordings of {args.activate}; fit it with:\n"
+                  f"    python examples/07_fit_osc_sysid.py --activate {args.activate} --physics_dt <s>")
+        except (OSError, ValueError, RuntimeError) as error:
+            print(f"\n  Could not add it to {args.activate}: {error}")
     print()
     return status
 

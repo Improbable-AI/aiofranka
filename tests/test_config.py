@@ -6,7 +6,8 @@ import mujoco
 import numpy as np
 import yaml
 
-from aiofranka.config import HOME, load_config, same_controller, save_sim, sim_entry
+from aiofranka.config import (HOME, add_recording, latest_recording, load_config, same_controller, save_sim,
+                              sim_entry, to_yaml)
 from aiofranka.controller import FrankaController
 from aiofranka.payload import MODEL_PATH
 from aiofranka.tools import NO_END_EFFECTOR, Tool
@@ -38,9 +39,21 @@ class LoadConfigTest(unittest.TestCase):
         np.testing.assert_allclose(config["ee_kd"], np.full(6, 20.0))
         np.testing.assert_allclose(config["null_kp"], np.full(7, 9.0))
         np.testing.assert_allclose(config["null_kd"], np.ones(7))
-        np.testing.assert_allclose(config["null_target"], HOME)
+        self.assertIsNone(config["null_target"])  # the joint positions when activated
         np.testing.assert_allclose(config["tcp"], np.eye(4))
         self.assertEqual(config["sim"], [])
+
+    def test_reads_null_target_forms(self):
+        osc = yaml.safe_load(OSC)
+        np.testing.assert_allclose(load_config(dict(osc, null_target="home"))["null_target"], HOME)
+        self.assertIsNone(load_config(dict(osc, null_target="current"))["null_target"])
+        self.assertIsNone(load_config(dict(osc, null_target=None))["null_target"])
+        np.testing.assert_allclose(load_config(dict(osc, null_target=[0.1] * 7))["null_target"], [0.1] * 7)
+        # A loaded configuration reads the same, and writes back as current.
+        config = load_config(osc)
+        self.assertTrue(same_controller(config, load_config(config)))
+        self.assertEqual(to_yaml(config)["null_target"], "current")
+        self.assertFalse(same_controller(osc, dict(osc, null_target="home")))
 
     def test_reads_impedance_and_tcp_forms(self):
         config = load_config({"mode": "impedance", "kp": 64, "kd": [16] * 7, "frequency": 25})
@@ -154,14 +167,52 @@ class SaveSimTest(unittest.TestCase):
         self.assertTrue(self.path.read_text().startswith("# my policy's controller"))
 
 
+class RecordingsTest(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        (self.root / "configs").mkdir()
+        (self.root / "data").mkdir()
+        self.path = self.root / "configs" / "osc.yaml"
+        self.path.write_text(OSC)
+
+    def test_lists_recordings_and_finds_the_latest(self):
+        self.assertIsNone(latest_recording(self.path))
+        first, second = self.root / "data" / "a.npz", self.root / "data" / "b.npz"
+        add_recording(self.path, {"path": first, "date": "2026-10-02T09:00:00", "tool": "gripper"})
+        save_sim(self.path, {"physics_dt": 0.005, "ee_kp": [1.0] * 6})
+        add_recording(self.path, {"path": str(second), "date": "2026-10-02T10:00:00", "tool": "gripper"})
+
+        config = load_config(self.path)
+        self.assertEqual([r["path"] for r in config["recordings"]], ["../data/a.npz", "../data/b.npz"])
+        self.assertEqual(latest_recording(self.path), second.resolve())
+        self.assertEqual(len(config["sim"]), 1)
+        text = self.path.read_text()
+        self.assertTrue(text.startswith(OSC))  # comments and layout kept
+        self.assertLess(text.index("recordings:"), text.index("sim:"))
+        self.assertNotIn("recordings", to_yaml(config))
+
+    def test_refuses_a_changed_controller(self):
+        recorded = yaml.safe_load(OSC)
+        self.path.write_text(OSC.replace("null_kp: 9", "null_kp: 3"))
+        with self.assertRaises(ValueError):
+            add_recording(self.path, {"path": self.root / "data" / "a.npz"}, controller=recorded)
+        self.assertIsNone(latest_recording(self.path))
+
+    def test_rejects_wrong_recordings(self):
+        for recordings in ({"path": "a.npz"}, [{"date": "today"}], [{"path": 3}]):
+            with self.subTest(recordings=recordings), self.assertRaises(ValueError):
+                load_config(dict(yaml.safe_load(OSC), recordings=recordings))
+
+
 class ActivateTest(unittest.TestCase):
     def setUp(self):
         self.robot = simulated_robot(mujoco.MjModel.from_xml_path(str(MODEL_PATH)))
         self.controller = FrankaController(self.robot)
 
     def test_applies_osc(self):
-        config = load_config(dict(yaml.safe_load(OSC), tcp=[0, 0, 0.1], null_target=[0.1] * 7))
-        self.controller.activate(config)
+        here = np.array(self.robot.data.qpos[:7])
+        config = load_config(dict(yaml.safe_load(OSC), tcp=[0, 0, 0.1], null_target=(here + 0.02).tolist()))
+        self.controller.activate(config)  # within arrival_tolerance of the null target
 
         c = self.controller
         self.assertEqual(c.type, "osc")
@@ -169,11 +220,27 @@ class ActivateTest(unittest.TestCase):
         np.testing.assert_allclose(c.ee_kd, config["ee_kd"])
         np.testing.assert_allclose(c.null_kp, config["null_kp"])
         np.testing.assert_allclose(c.null_kd, config["null_kd"])
-        np.testing.assert_allclose(c.initial_qpos, np.full(7, 0.1))
+        np.testing.assert_allclose(c.initial_qpos, here + 0.02)
         np.testing.assert_allclose(c.control_transform[:3, 3], [0, 0, 0.1])
         # Holds the TCP where it is.
         np.testing.assert_allclose(c.ee_desired, self.robot._ee() @ c.control_transform)
         self.assertEqual(c._update_freq, 50.0)
+
+    def test_keeps_the_posture_without_a_null_target(self):
+        self.robot.data.qpos[:7] += 0.2
+        mujoco.mj_forward(self.robot.model, self.robot.data)
+        self.controller.activate(yaml.safe_load(OSC))
+        np.testing.assert_allclose(self.controller.initial_qpos[:7], self.robot.data.qpos[:7])
+
+    def test_refuses_a_null_target_the_arm_is_not_at(self):
+        far = dict(yaml.safe_load(OSC), null_target="home")
+        self.robot.data.qpos[0] += 0.1
+        mujoco.mj_forward(self.robot.model, self.robot.data)
+        with self.assertRaisesRegex(RuntimeError, "joint 1"):
+            self.controller.activate(far)
+        self.assertEqual(self.controller.type, "impedance")  # nothing applied
+        self.controller.activate(far, check_null_target=False)
+        np.testing.assert_allclose(self.controller.initial_qpos, HOME)
 
     def test_applies_impedance_from_a_file(self):
         path = Path(tempfile.mkdtemp()) / "joint.yaml"
@@ -204,6 +271,22 @@ class ActivateTest(unittest.TestCase):
         self.robot.tool, self.robot.tool_error = None, "Desk did not answer"
         with self.assertRaisesRegex(RuntimeError, "Desk did not answer"):
             self.controller.activate(osc)
+
+    def test_move_ends_at_the_target(self):
+        import asyncio
+        controller = self.controller
+        target = np.array(controller.robot.data.qpos[:7]) + [0.0, 0.1, 0.0, -0.1, 0.0, 0.0, 0.1]
+
+        async def run():
+            await controller.start()
+            try:
+                await controller.move(target)
+            finally:
+                await controller.stop()
+
+        asyncio.run(run())
+        np.testing.assert_allclose(controller.q_desired, target)
+        self.assertLessEqual(np.abs(controller.robot.data.qpos[:7] - target).max(), controller.arrival_tolerance)
 
     def test_move_keeps_its_pace_after_a_fast_configuration(self):
         import asyncio
