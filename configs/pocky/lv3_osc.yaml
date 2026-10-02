@@ -1,0 +1,11 @@
+# Pocky Lv3 (heavy): 55 mm bored PLA Basic stick (expected 25 g) holding the 300 g, 29 x 64 mm steel weight (325 g total),
+# a 32 mm flat-ended cylinder on the aprilcube adapter; sim franka_tpushing_extreme_v9_lv3. TCP: control point on the stick axis, 12 mm above the flat end.
+mode: osc
+tool: lv3_tool
+ee_kp: [64, 64, 144, 144, 144, 144]
+ee_kd: [16, 16, 24, 24, 24, 24]
+null_kp: 10
+null_kd: 2
+null_target: [1.8816, -1.2358, -2.0430, -2.2479, -1.5736, 2.1345, 0.8159]
+tcp: [0, 0, 0.055]
+frequency: 50

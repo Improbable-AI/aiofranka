@@ -1,0 +1,11 @@
+# Pocky Lv1 (light): 230 mm solid PLA Basic stick (15% infill, expected 68 g), a 32 mm flat-ended cylinder
+# on the aprilcube adapter; sim franka_tpushing_extreme_v9_lv1. TCP: control point on the stick axis, 12 mm above the flat end.
+mode: osc
+tool: lv1_tool
+ee_kp: [64, 64, 144, 144, 144, 144]
+ee_kd: [16, 16, 24, 24, 24, 24]
+null_kp: 10
+null_kd: 2
+null_target: [1.6552, -1.0651, -1.6096, -2.3673, -1.2420, 1.9475, 0.8314]
+tcp: [0, 0, 0.230]
+frequency: 50
