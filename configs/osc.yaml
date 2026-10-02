@@ -1,8 +1,8 @@
 # Operational space control, as a policy runs it. Apply with controller.activate("configs/osc.yaml").
 mode: osc
 tool: none                       # Desk end-effector profile; none is "No End Effector"
-ee_kp: 100                       # x, y, z [N/m] and rotation [Nm/rad]: one value, or 6
-ee_kd: 20                        # [N s/m, Nm s/rad]
+ee_kp: 100                       # x, y, z, then rotation [1/s^2]: one value, or 6
+ee_kd: 20                        # [1/s]; times the task-space inertia: ee_kp = w^2, ee_kd = 2 zeta w
 null_kp: 9                       # null space [Nm/rad]: one value, or one per joint
 null_kd: 6                       # [Nm s/rad]
 # null_target: home              # 7 joint positions [rad] or home; left out, the posture when activated

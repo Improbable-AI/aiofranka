@@ -271,7 +271,7 @@ and ``set_freq()``:
    # configs/osc.yaml
    mode: osc
    tool: none                 # Desk end-effector profile it needs; none is "No End Effector"
-   ee_kp: 100                 # x, y, z [N/m] and rotation [Nm/rad]: one value, or 6
+   ee_kp: 100                 # x, y, z, then rotation [1/s^2]: one value, or 6
    ee_kd: 20
    null_kp: 9                 # one value, or one per joint (default 1)
    null_kd: 6                 # (default 1)

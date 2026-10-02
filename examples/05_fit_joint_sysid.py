@@ -8,9 +8,9 @@ the recorded joint targets, and for each of its decimation = (1 / hz) / physics_
 physics steps it computes aiofranka's joint impedance in Python, kp * (q_des - q) -
 kd * dq with the 990 Nm/s rate limit and the torque clip, and applies it through
 fr3.xml's <motor> actuators. Starting from the recorded kp and kd and fr3.xml's joint
-parameters, it fits kp, kd, armature, damping and friction loss of each joint to the
-measured joint positions, replaying 2 s windows from the measured state at their start.
-The windows at one pose are held out to check the fit.
+parameters, it fits kp, kd, damping and friction loss of each joint to the measured joint
+positions, replaying 2 s windows from the measured state at their start; the armature stays
+at fr3.xml's (--fixed). The windows at one pose are held out to check the fit.
 
     pip install mjbatch   # batched MuJoCo; it pins its own mujoco version
     python examples/05_fit_joint_sysid.py --activate configs/<name>.yaml --physics_dt 0.002
@@ -21,6 +21,8 @@ complete recordings it makes on the robot there); with --traj, that recording. I
 fit to the sim section of the configuration the recording was collected with (or
 --activate), as the entry for this physics_dt (see aiofranka.config). kd and joint
 damping both damp the joint velocity, so mostly their sum is determined; the fit reports both.
+Fitted, the armature mostly trades off against kp instead of measuring the joints, so it
+stays at fr3.xml's, like the link inertias; --fixed chooses what stays at its start value.
 """
 
 from __future__ import annotations
@@ -29,6 +31,7 @@ import argparse
 import datetime
 import json
 import math
+import os
 import time
 from pathlib import Path
 
@@ -55,7 +58,7 @@ class Run:
         self.meta = json.loads(str(data["meta"]))
         if self.meta.get("controller", "impedance") != "impedance":
             raise ValueError("Not a joint impedance recording; fit OSC recordings with 07_fit_osc_sysid.py")
-        for key in ("time", "q", "dq", "q_des", "tau_J_d", "pose"):
+        for key in ("time", "q", "dq", "q_des", "tau_J_d", "pose", "segment"):
             setattr(self, key, data[key])
         self.block = data["block"].astype(int)
         kp, kd, hz = data["kp"], data["kd"], data["rate_hz"]
@@ -224,31 +227,42 @@ class CMA:
         self.D = np.sqrt(np.maximum(d2, 1e-20))
 
 
-def decode(x, base):
-    """Parameter sets from log offsets to the base values, clipped to BOUNDS: (P, 35) -> dict of (P, 7)."""
-    x = np.atleast_2d(x).reshape(-1, len(PARAMETERS), 7)
-    return {name: np.clip(np.maximum(base[name], BOUNDS[name][0]) * np.exp(x[:, i]), *BOUNDS[name])
-            for i, name in enumerate(PARAMETERS)}
+def decode(x, base, free):
+    """
+    Parameter sets from log offsets of the free parameters to their base values, clipped to
+    BOUNDS, and the others at their base values: (P, 7 * len(free)) -> dict of (P, 7).
+    """
+    x = np.atleast_2d(x).reshape(-1, len(free), 7)
+    out = {name: np.repeat(base[name][None], len(x), axis=0) for name in PARAMETERS}
+    for i, name in enumerate(free):
+        out[name] = np.clip(np.maximum(base[name], BOUNDS[name][0]) * np.exp(x[:, i]), *BOUNDS[name])
+    return out
 
 
-def fit(sim, starts, length, base, generations, popsize, sigma, seed):
-    """CMA-ES over log offsets to base; returns the best parameters and their RMS error."""
+def fit(sim, starts, length, base, free, generations, popsize, sigma, seed):
+    """CMA-ES over log offsets of the free parameters to base; returns the best parameters and their RMS error."""
     measured = sim.measured(starts, length)
-    cma = CMA(len(PARAMETERS) * 7, popsize, sigma, seed)
+    cma = CMA(len(free) * 7, popsize, sigma, seed)
     best_x = np.zeros(cma.n)
-    best_cost = rms(sim.rollout(decode(best_x, base), starts, length), measured)[0]
-    print(f"  generation   0: RMS {1000 * best_cost:.3f} mrad (start)")
+    best_cost = rms(sim.rollout(decode(best_x, base, free), starts, length), measured)[0]
+    print(f"  generation   0: RMS {1000 * best_cost:.3f} mrad (start)", flush=True)
     t0 = time.perf_counter()
     for generation in range(1, generations + 1):
         x = cma.ask()
-        cost = rms(sim.rollout(decode(x, base), starts, length), measured)
+        cost = rms(sim.rollout(decode(x, base, free), starts, length), measured)
         cma.tell(x, cost)
         if cost.min() < best_cost:
             best_cost, best_x = cost.min(), x[cost.argmin()].copy()
-        if generation % 20 == 0 or generation == generations:
-            print(f"  generation {generation:3d}: RMS {1000 * best_cost:.3f} mrad, sigma {cma.sigma:.3f} "
-                  f"({time.perf_counter() - t0:.0f} s)")
-    return {name: value[0] for name, value in decode(best_x, base).items()}, best_cost
+        progress(generation, generations, 1000 * best_cost, 1000 * cost.min(), cma.sigma, t0, "mrad")
+    return {name: value[0] for name, value in decode(best_x, base, free).items()}, best_cost
+
+
+def progress(generation, generations, best, current, sigma, started, unit):
+    """One line per generation: the best error so far and this generation's, the step size and the time left."""
+    elapsed = time.perf_counter() - started
+    left = elapsed / generation * (generations - generation)
+    print(f"  generation {generation:3d}/{generations}: best {best:.3f} {unit}, this generation {current:.3f} {unit}, "
+          f"sigma {sigma:.3f}, {elapsed / generation:.1f} s each, {left / 60:.1f} min left", flush=True)
 
 
 def error(sim, params, starts, length):
@@ -257,6 +271,84 @@ def error(sim, params, starts, length):
         return float("nan")
     return float(rms(sim.rollout({k: v[None] for k, v in params.items()}, starts, length),
                      sim.measured(starts, length))[0])
+
+
+def plot_windows(run, length, holdout, poses):
+    """A steps window and a multisine window of the held-out pose, then of a training pose, labeled."""
+    multisine = run.meta["segments"].index("multisine")
+    out = []
+    for pose in ([holdout] if holdout in poses else []) + [p for p in poses if p != holdout]:
+        starts = run.windows(length, [pose])
+        if len(starts) == 0 or len(out) == 4:
+            continue
+        starts = starts[run.block[starts] == run.block[starts[0]]]  # the first block at the pose
+        mixed = max(starts, key=lambda start: np.mean(run.segment[start:start + length] == multisine))
+        tag = "held out" if pose == holdout else "train"
+        out += [(starts[0], f"{tag}, {pose}: steps"), (mixed, f"{tag}, {pose}: multisine")]
+    return out
+
+
+def pyplot():
+    """matplotlib.pyplot without a display, or None if it is not installed."""
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError:
+        print("  pip install matplotlib to save plots of the fit")
+        return None
+    return plt
+
+
+def draw(plt, windows, t, rows, path, title):
+    """
+    One column per window and one row per channel: rows is a list of (ylabel, {line: (values
+    (windows, samples), style)}).
+    """
+    fig, axes = plt.subplots(len(rows), len(windows), figsize=(3.4 * len(windows) + 1.2, 1.7 * len(rows) + 1),
+                             sharex=True, squeeze=False)
+    for row, (ylabel, lines) in enumerate(rows):
+        for col, (_, label) in enumerate(windows):
+            ax = axes[row, col]
+            for name, (values, style) in lines.items():
+                ax.plot(t, values[col], label=name, **style)
+            ax.grid(alpha=0.3)
+            if row == 0:
+                ax.set_title(label, fontsize=9)
+            if col == 0:
+                ax.set_ylabel(ylabel, fontsize=9)
+            ax.tick_params(labelsize=7)
+    for ax in axes[-1]:
+        ax.set_xlabel("time in the window [s]", fontsize=8)
+    axes[0, 0].legend(fontsize=7, loc="best")
+    fig.suptitle(title, fontsize=10)
+    fig.tight_layout()
+    fig.savefig(path, dpi=110)
+    plt.close(fig)
+    return path
+
+
+STYLES = {"target": dict(color="0.65", lw=1.0), "robot": dict(color="k", lw=1.8),
+          "fr3.xml": dict(color="tab:red", lw=1.1, ls="--"), "fit": dict(color="tab:blue", lw=1.2)}
+
+
+def plot_fit(sim, run, curves, windows, length, path, title):
+    """
+    Save the joint response in the windows: target, robot and each simulated parameter set
+    of curves ({label: params}), relative to the robot's joint positions at the window start.
+    """
+    plt = pyplot()
+    if plt is None:
+        return None
+    starts = np.array([start for start, _ in windows])
+    ticks = starts[:, None] + np.arange(sim.every, length + 1, sim.every)[None]
+    q = {"target": run.q_des[ticks], "robot": run.q[ticks]}
+    q.update({label: sim.rollout({k: v[None] for k, v in params.items()}, starts, length)[0]
+              for label, params in curves.items()})
+    start = run.q[starts][:, None]
+    rows = [(f"joint {j + 1} [mrad]", {name: (1000 * (values[..., j] - start[..., j]), STYLES[name])
+                                       for name, values in q.items()}) for j in range(7)]
+    return draw(plt, windows, np.arange(1, ticks.shape[1] + 1) * sim.every / CONTROL_HZ, rows, path, title)
 
 
 def configuration(run, path):
@@ -291,6 +383,10 @@ def main():
                         help="Recording of 04_collect_joint_sysid.py to fit (default: the latest of --activate)")
     parser.add_argument("--physics_dt", "--physics-dt", type=float, required=True,
                         help="Physics step of your simulation [s], a whole number of ms dividing the policy period")
+    parser.add_argument("--fixed", nargs="*", choices=PARAMETERS, default=["armature"], metavar="NAME",
+                        help="Parameters kept at their start values, the recorded gains and fr3.xml's joint "
+                             f"parameters: any of {', '.join(PARAMETERS)}; --fixed alone fits all of them. Fitted, "
+                             "the armature mostly trades off against kp instead of measuring the joints")
     parser.add_argument("--holdout", default="last",
                         help="Pose whose windows are left out of the fit: a pose name, last, or none")
     parser.add_argument("--window", type=float, default=2.0, help="Window length [s]")
@@ -300,6 +396,10 @@ def main():
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--threads", type=int, default=0, help="Simulation threads (0: all CPUs)")
     args = parser.parse_args()
+    free = tuple(name for name in PARAMETERS if name not in args.fixed)
+    fixed = [name for name in PARAMETERS if name not in free]
+    if not free:
+        parser.error("--fixed leaves nothing to fit")
 
     if args.traj is None:
         if args.activate is None:
@@ -330,10 +430,11 @@ def main():
     print(f"  Tool {run.meta.get('tool') or '(not read from Desk)'}: the model carries the payload the robot compensated, "
           f"{run.payload['mass']:.3f} kg at {np.round(run.payload['com'], 4).tolist()} m")
     print(f"  physics_dt {args.physics_dt * 1000:g} ms, decimation {sim.decimation}; fitting {len(train)} windows "
-          f"of {length / CONTROL_HZ:g} s, holding out {len(test)} at {holdout}\n")
+          f"of {length / CONTROL_HZ:g} s, holding out {len(test)} at {holdout}")
+    print(f"  Fitting {', '.join(free)}" + (f"; keeping {', '.join(fixed)} at the start values" if fixed else "") + "\n")
 
     base = sim.start_values()
-    params, cost = fit(sim, train, length, base, args.generations, args.popsize, args.sigma, args.seed)
+    params, cost = fit(sim, train, length, base, free, args.generations, args.popsize, args.sigma, args.seed)
 
     errors = {label: {"train": error(sim, p, train, length), "held_out": error(sim, p, test, length)}
               for label, p in (("start", base), ("fit", params))}
@@ -344,6 +445,14 @@ def main():
     for j in range(7):
         cells = "  ".join(f"{base[n][j]:6.3g} -> {params[n][j]:<6.3g}" for n in PARAMETERS)
         print(f"  {j + 1}     {cells}  {params['kd'][j] + params['damping'][j]:.3g}")
+
+    plot = plot_fit(sim, run, {"fr3.xml": base, "fit": params}, plot_windows(run, length, holdout, recorded), length,
+                    args.traj.with_name(f"{args.traj.stem}_fit_{1000 * args.physics_dt:g}ms_joints.png"),
+                    f"{args.traj.name}, physics_dt {1000 * args.physics_dt:g} ms: joint RMS train "
+                    f"{1000 * errors['start']['train']:.2f} -> {1000 * errors['fit']['train']:.2f} mrad, held out "
+                    f"{1000 * errors['start']['held_out']:.2f} -> {1000 * errors['fit']['held_out']:.2f} mrad")
+    if plot is not None:
+        print(f"\n  Saved the response curves: {plot}")
 
     save_sim(config_path, {
         "physics_dt": args.physics_dt,
@@ -356,7 +465,9 @@ def main():
             "holdout": holdout,
             "plant": "mujoco" if run.meta.get("sim") else "robot",
             "tool": run.meta.get("tool"),
+            "fixed": fixed,
             "rms_mrad": {label: {split: 1000 * value for split, value in e.items()} for label, e in errors.items()},
+            **({"plots": [os.path.relpath(plot.resolve(), config_path.resolve().parent)]} if plot else {}),
         },
     }, controller=recorded_controller)
     print(f"\n  Added the fit for physics_dt {args.physics_dt:g} to {config_path}\n")

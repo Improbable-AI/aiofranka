@@ -10,7 +10,13 @@ change at the policy rate and are held in between, as a policy's actions are:
     hold 0.5 s | 2 steps, 3 s | 6-DOF multisine 0.17-3 Hz, 6 s | slow ramps, 3 s | hold 0.5 s
 
 Position offsets are in the base frame, rotation offsets are rotation vectors in the base
-frame about the TCP. Every 1 kHz control tick goes to one npz,
+frame about the TCP. Steps are at most 30 mm and 0.1 rad, smaller where a step of all six
+axes at once would command joint torques beyond half the torque limits: the OSC commands
+the wrench Λ·ee_kp·offset, with Λ the task-space inertia of aiofranka's model at the base
+pose (with the tool's payload once connected). The multisine and ramps go up to 80 mm in x
+and y, 50 mm in z and 0.25 rad, the multisine at up to 0.3 m/s and 1 rad/s, scaled down
+where an ideal OSC following them would command torques beyond half the limits or move a
+joint faster than half its speed limit. Every 1 kHz control tick goes to one npz,
 examples/sysid_data/osc_sysid_<date>.npz.
 
     python examples/06_collect_osc_sysid.py 173.16.0.2 --activate configs/osc.yaml
@@ -82,10 +88,13 @@ HOLD = 0.5  # s at the start and end of a block
 STEP_COUNT, STEP_HOLD = 2, 0.75  # steps; s at each step's offset, then as long back
 MULTISINE_S, MULTISINE_FMAX, FADE = 6.0, 3.0, 0.5  # s (one period of the lowest harmonic), Hz, s
 RAMP_QUARTER = 0.75  # s from 0 to the ramp's peak
-SIZE = np.array([0.03] * 3 + [0.1] * 3)  # largest offset of each segment [m, rad]
-WRENCH = np.array([20.0] * 3 + [5.0] * 3)  # largest ee_kp * offset [N, Nm]; smaller offsets for stiffer gains
-SPEED = np.array([0.1] * 3 + [0.4] * 3)  # largest multisine speed [m/s, rad/s]
-RAMP_SIZE = 0.5  # ramp peak, as a fraction of the size
+STEP_SIZE = np.array([0.03] * 3 + [0.1] * 3)  # largest step [m, rad]
+WAVE_SIZE = np.array([0.08, 0.08, 0.05] + [0.25] * 3)  # largest multisine and ramp offset [m, rad]
+WAVE_SPEED = np.array([0.3, 0.3, 0.2] + [1.0] * 3)  # largest multisine speed [m/s, rad/s]
+TORQUE_FRACTION = 0.5  # largest joint torques, as a fraction of the limits
+TORQUE_LIMIT = np.array([87.0] * 4 + [12.0] * 3)  # FrankaController.torque_limit [Nm]
+SPEED_FRACTION = 0.5  # largest joint speeds of the multisine and ramps, as a fraction of the limits
+SPEED_LIMIT = np.array([2.62, 2.62, 2.62, 2.62, 5.26, 4.18, 5.26])  # FR3 joint speed limits [rad/s]
 
 PLAN_LIMIT_MARGIN = 0.1  # rad between every IK solution and the joint limits
 
@@ -143,7 +152,7 @@ def steps(size, rng):
     return np.concatenate(parts)
 
 
-def multisine(size):
+def multisine(size, speed):
     """Sums of sines with different harmonics per axis, about flat in velocity, Schroeder phases."""
     t = np.arange(ticks(MULTISINE_S)) / CONTROL_HZ
     fade = np.clip(np.minimum(t, MULTISINE_S - t) / FADE, 0.0, 1.0)
@@ -154,35 +163,97 @@ def multisine(size):
         n = np.arange(len(k))
         phase = -np.pi * n * (n - 1) / len(k)
         shape = (np.sin(2 * np.pi * np.outer(t, k) / MULTISINE_S + phase) / k).sum(1) * fade
-        speed = np.abs(np.gradient(shape, 1.0 / CONTROL_HZ)).max()
-        offsets[:, axis] = shape * min(size[axis] / np.abs(shape).max(), SPEED[axis] / speed)
+        peak_speed = np.abs(np.gradient(shape, 1.0 / CONTROL_HZ)).max()
+        offsets[:, axis] = shape * min(size[axis] / np.abs(shape).max(), speed[axis] / peak_speed)
     return offsets
 
 
 def ramps(size):
-    """A triangle up and down to +/- RAMP_SIZE of the size, alternating sign by axis."""
+    """A triangle up and down to +/- size, alternating sign by axis."""
     u = np.arange(ticks(4 * RAMP_QUARTER)) / CONTROL_HZ / RAMP_QUARTER
     triangle = 1.0 - np.abs((u + 1.0) % 4.0 - 2.0)
-    return np.outer(triangle, RAMP_SIZE * size * np.array([1.0, -1.0, 1.0, -1.0, 1.0, -1.0]))
+    return np.outer(triangle, size * np.array([1.0, -1.0, 1.0, -1.0, 1.0, -1.0]))
 
 
-def plan(poses, ee_kp, rate, repeats, seed):
-    """The blocks in the order they run, repeats at each pose with different steps."""
-    size = np.minimum(SIZE, WRENCH / ee_kp)
+def waves(rate):
+    """The multisine and the ramps at full size, held at the policy rate."""
+    offsets = np.concatenate([multisine(WAVE_SIZE, WAVE_SPEED), ramps(WAVE_SIZE)])
+    period = CONTROL_HZ // rate
+    return offsets[np.arange(len(offsets)) // period * period]
+
+
+def ideal_response(offsets, ee_kp, ee_kd):
+    """
+    The acceleration commands and velocities (T, 6) of an ideal OSC, each task axis a unit
+    mass under ee_kp and ee_kd, following offsets (T, 6) from rest at 1 kHz.
+    """
+    x, v = np.zeros(6), np.zeros(6)
+    acceleration, velocity = np.empty_like(offsets), np.empty_like(offsets)
+    for k, target in enumerate(offsets):
+        a = ee_kp * (target - x) - ee_kd * v
+        acceleration[k], velocity[k] = a, v
+        v = v + a / CONTROL_HZ
+        x = x + v / CONTROL_HZ
+    return acceleration, velocity
+
+
+def excitation(model, poses, tcp, ee_kp, ee_kd, rate):
+    """
+    How large the excitation can be at each base pose, from the TCP's Jacobian J and the
+    task-space inertia Λ of the model there (the OSC commands the joint torques Jᵀ Λ a for
+    an acceleration command a = ee_kp·e - ee_kd·v):
+
+    - steps: STEP_SIZE, scaled down where a step of all six axes at once, signs adding up,
+      would command torques beyond TORQUE_FRACTION of the limits;
+    - multisine and ramps: their full size times a scale of at most 1, at which an ideal OSC
+      following them would command torques within TORQUE_FRACTION of the limits and move
+      the joints (J⁺ v) within SPEED_FRACTION of the limits.
+
+    Returns:
+        dict: By pose, step (6,) and step_torque (7,), and wave (the scale), wave_torque
+        and wave_speed (7,) at that scale
+    """
+    data = mujoco.MjData(model)
+    site = model.site("attachment_site").id
+    acceleration, velocity = ideal_response(waves(rate), ee_kp, ee_kd)
+    out = {}
+    for name, q in poses.items():
+        data.qpos[:7] = q
+        mujoco.mj_forward(model, data)
+        jac = np.zeros((6, model.nv))
+        mujoco.mj_jacSite(model, data, jac[:3], jac[3:], site)
+        jac = jac[:, :7]
+        jac[:3] += np.cross(jac[3:].T, data.site_xmat[site].reshape(3, 3) @ tcp[:3, 3]).T  # the TCP's
+        mass = np.zeros((model.nv, model.nv))
+        mujoco.mj_fullM(model, data, mass)
+        torque_map = jac.T @ np.linalg.inv(jac @ np.linalg.inv(mass[:7, :7]) @ jac.T)  # Jᵀ Λ (7, 6)
+        per_offset = np.abs(torque_map * ee_kp)  # joint torque per unit step of each axis
+        step = STEP_SIZE * min(1.0, (TORQUE_FRACTION * TORQUE_LIMIT / (per_offset @ STEP_SIZE)).min())
+        torque = np.abs(acceleration @ torque_map.T).max(0)
+        speed = np.abs(velocity @ np.linalg.pinv(jac).T).max(0)
+        wave = min(1.0, (TORQUE_FRACTION * TORQUE_LIMIT / torque).min(), (SPEED_FRACTION * SPEED_LIMIT / speed).min())
+        out[name] = {"step": step, "step_torque": per_offset @ step,
+                     "wave": wave, "wave_torque": wave * torque, "wave_speed": wave * speed}
+    return out
+
+
+def plan(poses, limits, rate, repeats, seed):
+    """The blocks in the order they run, repeats at each pose with different steps; limits from excitation()."""
     hold = np.zeros((ticks(HOLD), 6))
-    shared = multisine(size), ramps(size)
+    shared = multisine(WAVE_SIZE, WAVE_SPEED), ramps(WAVE_SIZE)
     period = CONTROL_HZ // rate
     blocks = []
     for pose in poses:
+        scaled = [wave * limits[pose]["wave"] for wave in shared]
         for _ in range(repeats):
             rng = np.random.default_rng([seed, len(blocks)])
-            parts = [hold, steps(size, rng), *shared, hold]
+            parts = [hold, steps(limits[pose]["step"], rng), *scaled, hold]
             offsets = np.concatenate(parts)
             segment = np.concatenate([np.full(len(p), i, np.int8) for i, p in zip((0, 1, 2, 3, 0), parts)])
             # Zero-order hold: each target lasts CONTROL_HZ / rate ticks.
             held = offsets[np.arange(len(offsets)) // period * period]
             blocks.append(Block(pose, held, rotation(held[:, 3:]), segment))
-    return blocks, size
+    return blocks
 
 
 def site_pose(model, data, site, q):
@@ -242,6 +313,60 @@ def null_space_error(jac, rotation, tcp, q, q_null):
     return np.abs((np.eye(7) - np.linalg.pinv(jac) @ jac) @ (q_null - q)).max()
 
 
+def check_targets(q0, offsets, tcp, q_null, model, data, clearance):
+    """
+    The first problem with TCP offsets (n, 6) from base pose q0, solved in order with inverse
+    kinematics biased toward the null-space target (q0 itself if q_null is None), or None.
+    """
+    site = model.site("attachment_site").id
+    lower = model.jnt_range[:7, 0] + PLAN_LIMIT_MARGIN
+    upper = model.jnt_range[:7, 1] - PLAN_LIMIT_MARGIN
+    flange_from_tcp = np.linalg.inv(tcp)
+    base = site_pose(model, data, site, q0) @ tcp
+    target_q = q0 if q_null is None else q_null
+    # Where the null space settles while the OSC holds the base pose.
+    q, _, _ = ik(model, data, site, base @ flange_from_tcp, q0, target_q, iterations=300)
+    changes = np.ones(len(offsets), bool)
+    changes[1:] = np.any(offsets[1:] != offsets[:-1], axis=1)
+    for offset in offsets[changes]:
+        target = apply(base, offset[None])[0] @ flange_from_tcp
+        q, position_error, rotation_error = ik(model, data, site, target, q, target_q)
+        if position_error > 1e-3 or rotation_error > 5e-3:
+            return f"a target is out of reach (offset {np.round(offset, 3).tolist()})"
+        if np.any(q < lower) or np.any(q > upper):
+            return f"a target needs a joint within {PLAN_LIMIT_MARGIN} rad of its limit: {np.round(q, 3).tolist()}"
+        if not _is_clear(model, data, q):
+            return f"{_closest(model, data, q, clearance)} at {np.round(q, 3).tolist()}"
+    return None
+
+
+def fit_waves(limits, poses, rate, tcp, q_null, model, data, clearance, iterations=6):
+    """
+    Scale each pose's multisine and ramps down, by bisection, to the largest size at which
+    all their targets pass check_targets(). Returns the poses where they had to shrink.
+    """
+    shared = np.concatenate([multisine(WAVE_SIZE, WAVE_SPEED), ramps(WAVE_SIZE)])
+    period = CONTROL_HZ // rate
+    held = shared[np.arange(len(shared)) // period * period]
+    shrunk = {}
+    for name, q0 in poses.items():
+        high = limits[name]["wave"]
+        if check_targets(q0, held * high, tcp, q_null, model, data, clearance) is None:
+            continue
+        low = 0.0
+        for _ in range(iterations):
+            middle = 0.5 * (low + high)
+            if check_targets(q0, held * middle, tcp, q_null, model, data, clearance) is None:
+                low = middle
+            else:
+                high = middle
+        shrunk[name] = low / limits[name]["wave"]
+        for key in ("wave_torque", "wave_speed"):
+            limits[name][key] = limits[name][key] * shrunk[name]
+        limits[name]["wave"] = low
+    return shrunk
+
+
 def check(blocks, poses, tcp, q_null, model, data, clearance):
     """
     Problems with the targets and the moves between poses, if any. q_null is the
@@ -249,14 +374,7 @@ def check(blocks, poses, tcp, q_null, model, data, clearance):
     """
     problems = []
     site = model.site("attachment_site").id
-    lower = model.jnt_range[:7, 0] + PLAN_LIMIT_MARGIN
-    upper = model.jnt_range[:7, 1] - PLAN_LIMIT_MARGIN
-    flange_from_tcp = np.linalg.inv(tcp)
     for pose, q0 in poses.items():
-        base = site_pose(model, data, site, q0) @ tcp
-        # Where the null space settles while the OSC holds the base pose.
-        target_q = q0 if q_null is None else q_null
-        q_base, _, _ = ik(model, data, site, base @ flange_from_tcp, q0, target_q, iterations=300)
         if q_null is not None:
             site_pose(model, data, site, q0)
             mujoco.mj_comPos(model, data)
@@ -265,23 +383,10 @@ def check(blocks, poses, tcp, q_null, model, data, clearance):
             rest = null_space_error(jac[:, :7], data.site_xmat[site].reshape(3, 3), tcp, q0, q_null)
             if rest > NULL_REST_TOLERANCE:
                 problems.append(f"{pose}: the null space is not at rest there ({rest:.2f} rad toward the null target)")
-        targets = np.concatenate([b.offsets for b in blocks if b.pose == pose])
-        changes = np.ones(len(targets), bool)
-        changes[1:] = np.any(targets[1:] != targets[:-1], axis=1)
-        q = q_base
-        for offset in targets[changes]:
-            target = apply(base, offset[None])[0] @ flange_from_tcp
-            q, position_error, rotation_error = ik(model, data, site, target, q, target_q)
-            if position_error > 1e-3 or rotation_error > 5e-3:
-                problems.append(f"{pose}: a target is out of reach (offset {np.round(offset, 3).tolist()})")
-                break
-            if np.any(q < lower) or np.any(q > upper):
-                problems.append(f"{pose}: a target needs a joint within {PLAN_LIMIT_MARGIN} rad of its limit: "
-                                f"{np.round(q, 3).tolist()}")
-                break
-            if not _is_clear(model, data, q):
-                problems.append(f"{pose}: {_closest(model, data, q, clearance)} at {np.round(q, 3).tolist()}")
-                break
+        problem = check_targets(q0, np.concatenate([b.offsets for b in blocks if b.pose == pose]), tcp, q_null,
+                                model, data, clearance)
+        if problem:
+            problems.append(f"{pose}: {problem}")
     order = list(poses) + [next(iter(poses))]
     for a, b in zip(order, order[1:]):
         if a != b and not path_clear(model, data, poses[a], poses[b]):
@@ -506,6 +611,21 @@ def summarize(path):
               f"   {100 * rate_limited[rows].mean():11.1f}%   {100 * clipped[rows].mean():6.1f}%")
 
 
+def print_limits(limits, shrunk):
+    shared = np.concatenate([multisine(WAVE_SIZE, WAVE_SPEED), ramps(WAVE_SIZE)])
+    size = np.abs(shared).max(0)
+    speed = np.abs(np.gradient(multisine(WAVE_SIZE, WAVE_SPEED), 1.0 / CONTROL_HZ, axis=0)).max(0)
+    for name, limit in limits.items():
+        step, scale = limit["step"], limit["wave"]
+        print(f"  {name}: steps up to {1000 * step[:3].max():.0f} mm and {1000 * step[3:].max():.0f} mrad "
+              f"(torques up to {limit['step_torque'][:4].max():.0f} / {limit['step_torque'][4:].max():.1f} Nm)")
+        print(f"  {' ' * len(name)}  multisine and ramps up to {1000 * scale * size[:3].max():.0f} mm and "
+              f"{1000 * scale * size[3:].max():.0f} mrad, at up to {scale * speed[:3].max():.2f} m/s and "
+              f"{scale * speed[3:].max():.2f} rad/s (torques up to {limit['wave_torque'][:4].max():.0f} / "
+              f"{limit['wave_torque'][4:].max():.1f} Nm, joint speeds up to {limit['wave_speed'].max():.2f} rad/s)"
+              + (f", {100 * shrunk[name]:.0f}% of their size to keep the clearance" if name in shrunk else ""))
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description=__doc__.split("\n\n")[1].replace("\n", " "),
@@ -564,7 +684,11 @@ async def main() -> int:
     else:
         poses, problems = null_branch_poses(names, args.tcp, args.null_target, model, data)
     gains = {"ee_kp": args.ee_kp, "ee_kd": args.ee_kd, "null_kp": args.null_kp, "null_kd": args.null_kd}
-    blocks, size = plan(poses, args.ee_kp, args.hz, args.repeats, args.seed)
+    # aiofranka's model; the tool's payload joins it once connected.
+    limits = excitation(mujoco.MjModel.from_xml_path(str(MODEL_PATH)), poses, args.tcp, args.ee_kp, args.ee_kd,
+                        args.hz)
+    shrunk = fit_waves(limits, poses, args.hz, args.tcp, args.null_target, model, data, args.clearance)
+    blocks = plan(poses, limits, args.hz, args.repeats, args.seed)
 
     problems += check(blocks, poses, args.tcp, args.null_target, model, data, args.clearance)
     total = sum(len(b.offsets) for b in blocks)
@@ -578,11 +702,11 @@ async def main() -> int:
     print(f"  TCP translation {args.tcp[:3, 3].tolist()} m, targets at {args.hz} Hz")
     print(f"  {len(blocks)} blocks, {args.repeats} at each of {', '.join(poses)}: about "
           f"{(total / CONTROL_HZ + moves) / 60:.1f} min, {total * 580 / 1e6:.0f} MB")
-    print(f"  Offsets up to {1000 * size[:3].max():.0f} mm and {1000 * size[3:].max():.0f} mrad")
     site = model.site("attachment_site").id
     for name, q in poses.items():
         tcp_at = (site_pose(model, data, site, q) @ args.tcp)[:3, 3]
         print(f"  {name}: TCP at {np.round(tcp_at, 3).tolist()} m, joints {np.round(q, 3).tolist()}")
+    print_limits(limits, shrunk)
     if problems:
         print("\n  Not safe to run:")
         for problem in problems:
@@ -608,6 +732,19 @@ async def main() -> int:
     load = robot_load(robot)
     print(f"  Payload the robot compensates: {load['payload']['mass']:.3f} kg at "
           f"{np.round(load['payload']['com'], 4).tolist()} m")
+    if robot.payload["mass"] > 0:
+        # Size the steps again with the payload in the model, and check them again.
+        limits = excitation(robot.model, poses, args.tcp, args.ee_kp, args.ee_kd, args.hz)
+        shrunk = fit_waves(limits, poses, args.hz, args.tcp, args.null_target, model, data, args.clearance)
+        blocks = plan(poses, limits, args.hz, args.repeats, args.seed)
+        problems = check(blocks, poses, args.tcp, args.null_target, model, data, args.clearance)
+        print_limits(limits, shrunk)
+        if problems:
+            print("\n  Not safe to run with the payload:")
+            for problem in problems:
+                print(f"    {problem}")
+            print()
+            return 1
 
     controller = Collector(robot)
     if not args.no_check_tool:

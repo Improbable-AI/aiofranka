@@ -361,14 +361,15 @@ IP as an optional argument and runs in MuJoCo without it:
 - ``04_collect_joint_sysid.py``: Record steps, multisines and slow ramps with joint impedance at three
   poses, about 1.5 minutes, with a controller configuration (``--activate configs/joint_impedance.yaml``,
   see :ref:`controller-configurations`)
-- ``05_fit_joint_sysid.py``: Fit kp, kd, armature, damping and friction loss of each joint to the
+- ``05_fit_joint_sysid.py``: Fit kp, kd, damping and friction loss of each joint to the
   configuration's latest recording with CMA-ES, simulating at your physics step (``--activate``,
   ``--physics_dt``; ``--traj`` for another recording), and add the fit to the configuration's
-  ``sim`` section. Needs ``pip install mjbatch``.
+  ``sim`` section. The armature stays at fr3.xml's, like the link inertias; ``--fixed`` chooses
+  which parameters stay at their start values. Needs ``pip install mjbatch``.
 - ``06_collect_osc_sysid.py``: The same with operational space control
   (``--activate configs/osc.yaml``), about 2 minutes
-- ``07_fit_osc_sysid.py``: Fit ee_kp, ee_kd, null_kp, null_kd and each joint's armature, damping
-  and friction loss to an OSC recording, weighing the TCP response and the joints
+- ``07_fit_osc_sysid.py``: Fit ee_kp, ee_kd, null_kp, null_kd and each joint's damping and friction
+  loss to an OSC recording, weighing the TCP response and the joints
 
 Research scripts (system identification, SpaceMouse teleoperation, Robotiq gripper) are on the
 `research-scripts <https://github.com/younghyopark/aiofranka/tree/research-scripts>`_ branch.

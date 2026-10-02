@@ -2,8 +2,8 @@
 # Apply with controller.activate("configs/osc_franka_hand.yaml").
 mode: osc
 tool: Franka Hand with default configuration   # Desk end-effector profile it needs
-ee_kp: [300, 300, 300, 30, 30, 30]             # x, y, z [N/m] and rotation [Nm/rad]
-ee_kd: [35, 35, 35, 3, 3, 3]                   # [N s/m, Nm s/rad]
+ee_kp: [300, 300, 300, 30, 30, 30]             # x, y, z, then rotation [1/s^2]
+ee_kd: [35, 35, 35, 11, 11, 11]                # [1/s]; about critically damped: 2 sqrt(ee_kp)
 null_kp: 10                                    # null space [Nm/rad]
 null_kd: 2                                     # [Nm s/rad]
 null_target: [0, 0, 0, -1.5708, 0, 1.5708, -0.7854]

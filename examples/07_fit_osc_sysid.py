@@ -11,16 +11,21 @@ actuators:
     tau = J^T Lambda (ee_kp * e - ee_kd * J dq) + (I - J^T Jbar^T) (null_kp * (q_null - q) - null_kd * dq)
 
 with the TCP and null-space target of the recording, the 990 Nm/s rate limit and the
-torque clip. Lambda and Jbar come from the mass matrix with fr3.xml's armature, as on the
-robot (--mass_matrix plant takes the fitted armature instead, for an environment that
-uses its own model's mass matrix). Starting from the recorded gains and fr3.xml's joint
-parameters, it fits ee_kp, ee_kd, null_kp, null_kd and each joint's armature, damping and
-friction loss to the measured motion, replaying 2 s windows from the measured state at
-their start. The error combines the TCP response and the joints, as a length:
+torque clip. Lambda and Jbar come from a mass matrix with fr3.xml's armature, as aiofranka
+computes them on the robot. Starting from the recorded gains and fr3.xml's joint
+parameters, it fits ee_kp, ee_kd, null_kp, null_kd and each joint's damping and friction
+loss to the measured motion, replaying 2 s windows from the measured state at their start.
+The armature stays at fr3.xml's, like the link inertias: fitted, it mostly trades off
+against the gains instead of measuring the joints. --fixed chooses what stays at its start
+value; with the armature fitted, --mass_matrix plant gives the OSC the fitted armature too,
+for an environment that computes the OSC from its simulated model's mass matrix. The error
+weighs the joints by --joint_weight (0.8) and the TCP by the rest, half position and half
+rotation:
 
-    sqrt(tcp_position^2 + (rotation_weight * tcp_rotation)^2 + (joint_weight * joints)^2)
+    sqrt(joint_weight * joints^2 + (1 - joint_weight) * (tcp_position^2 + tcp_rotation^2) / 2)
 
-each an RMS over the window samples (the joints per joint). The windows at one pose are
+each an RMS over the window samples (the joints per joint) relative to fr3.xml's on the
+training windows, so fr3.xml with the recorded gains scores 1. The windows at one pose are
 held out to check the fit.
 
     pip install mjbatch   # batched MuJoCo; it pins its own mujoco version
@@ -39,6 +44,7 @@ import argparse
 import datetime
 import json
 import math
+import os
 import time
 from pathlib import Path
 
@@ -66,7 +72,7 @@ class Run:
         self.meta = json.loads(str(data["meta"]))
         if self.meta.get("controller") != "osc":
             raise ValueError("Not an OSC recording; fit joint impedance recordings with 05_fit_joint_sysid.py")
-        for key in ("time", "q", "dq", "ee_des", "tau_cmd", "tau_J_d", "pose", "tcp"):
+        for key in ("time", "q", "dq", "ee_des", "tau_cmd", "tau_J_d", "pose", "tcp", "segment"):
             setattr(self, key, data[key])
         self.block = data["block"].astype(int)
         self.gains = {}
@@ -269,6 +275,11 @@ class Simulator:
     def measured(self, starts, length):
         """Measured motion at the samples of rollout(), without the parameter axis."""
         q = self.run.q[starts[:, None] + np.arange(self.every, length + 1, self.every)[None]]
+        pos, rot = self.tcp_poses(q)
+        return {"q": q, "pos": pos, "rot": rot}
+
+    def tcp_poses(self, q):
+        """TCP positions (..., 3) and rotations (..., 3, 3) at joint positions q (..., 7)."""
         data = mujoco.MjData(self.model)
         pos, rot = np.empty(q.shape[:-1] + (3,)), np.empty(q.shape[:-1] + (3, 3))
         for index in np.ndindex(q.shape[:-1]):
@@ -277,7 +288,7 @@ class Simulator:
             flange_rot = data.site_xmat[self.site].reshape(3, 3)
             pos[index] = data.site_xpos[self.site] + flange_rot @ self.run.tcp[:3, 3]
             rot[index] = flange_rot @ self.run.tcp[:3, :3]
-        return {"q": q, "pos": pos, "rot": rot}
+        return pos, rot
 
 
 def errors(simulated, measured):
@@ -293,10 +304,19 @@ def errors(simulated, measured):
             "tcp_rotation": np.sqrt(np.mean(np.sum(rot ** 2, -1), axis=(1, 2)))}
 
 
-def cost(error, weights):
-    """The fit's error, as a length [m] (P,)."""
-    return np.sqrt(error["tcp_position"] ** 2 + (weights["rotation"] * error["tcp_rotation"]) ** 2
-                   + (weights["joint"] * error["joints"]) ** 2)
+# The smallest errors the fit's error is relative to, where fr3.xml already matches [m, rad, rad].
+SCALE_FLOOR = {"tcp_position": 1e-4, "tcp_rotation": 1e-3, "joints": 1e-4}
+
+
+def cost(error, weights, scale):
+    """
+    The fit's error (P,): the joints weighted by weights["joints"] and the TCP by the rest,
+    half position and half rotation, each relative to scale (fr3.xml's), so fr3.xml scores 1.
+    """
+    tcp = 0.5 * ((error["tcp_position"] / scale["tcp_position"]) ** 2
+                 + (error["tcp_rotation"] / scale["tcp_rotation"]) ** 2)
+    joints = (error["joints"] / scale["joints"]) ** 2
+    return np.sqrt((1.0 - weights["joints"]) * tcp + weights["joints"] * joints)
 
 
 class CMA:
@@ -342,44 +362,155 @@ class CMA:
         self.D = np.sqrt(np.maximum(d2, 1e-20))
 
 
-def decode(x, base):
-    """Parameter sets from log offsets to the base values, clipped to BOUNDS: (P, 47) -> dict of (P, size)."""
+def decode(x, base, free):
+    """
+    Parameter sets from log offsets of the free parameters to their base values, clipped to
+    BOUNDS, and the others at their base values: (P, n) -> dict of (P, size).
+    """
     x = np.atleast_2d(x)
     out, i = {}, 0
     for name, size in SIZES.items():
+        if name not in free:
+            out[name] = np.repeat(base[name][None], len(x), axis=0)
+            continue
         low, high = BOUNDS[name]
         out[name] = np.clip(np.maximum(base[name], low) * np.exp(x[:, i:i + size]), low, high)
         i += size
     return out
 
 
-def fit(sim, starts, length, base, weights, generations, popsize, sigma, seed):
-    """CMA-ES over log offsets to base; returns the best parameters and their error [m]."""
+def fit(sim, starts, length, base, free, weights, generations, popsize, sigma, seed):
+    """
+    CMA-ES over log offsets of the free parameters to base; returns the best parameters,
+    their error (relative to base's) and the scale it is relative to (base's errors on the
+    windows).
+    """
     measured = sim.measured(starts, length)
-    cma = CMA(sum(SIZES.values()), popsize, sigma, seed)
+    cma = CMA(sum(SIZES[name] for name in free), popsize, sigma, seed)
     best_x = np.zeros(cma.n)
-    best_cost = cost(errors(sim.rollout(decode(best_x, base), starts, length), measured), weights)[0]
-    print(f"  generation   0: error {1000 * best_cost:.3f} mm (start)")
+    start = errors(sim.rollout(decode(best_x, base, free), starts, length), measured)
+    scale = {key: max(float(value[0]), SCALE_FLOOR[key]) for key, value in start.items()}
+    best_cost = cost(start, weights, scale)[0]
+    print(f"  generation   0: error {best_cost:.3f} (fr3.xml: TCP {1000 * scale['tcp_position']:.2f} mm, "
+          f"{1000 * scale['tcp_rotation']:.1f} mrad, joints {1000 * scale['joints']:.2f} mrad)", flush=True)
     t0 = time.perf_counter()
     for generation in range(1, generations + 1):
         x = cma.ask()
-        costs = cost(errors(sim.rollout(decode(x, base), starts, length), measured), weights)
+        costs = cost(errors(sim.rollout(decode(x, base, free), starts, length), measured), weights, scale)
         cma.tell(x, costs)
         if costs.min() < best_cost:
             best_cost, best_x = costs.min(), x[costs.argmin()].copy()
-        if generation % 20 == 0 or generation == generations:
-            print(f"  generation {generation:3d}: error {1000 * best_cost:.3f} mm, sigma {cma.sigma:.3f} "
-                  f"({time.perf_counter() - t0:.0f} s)")
-    return {name: value[0] for name, value in decode(best_x, base).items()}, best_cost
+        progress(generation, generations, best_cost, costs.min(), cma.sigma, t0, "")
+    return {name: value[0] for name, value in decode(best_x, base, free).items()}, best_cost, scale
 
 
-def evaluate(sim, params, starts, length, weights):
-    """The errors of one parameter set over the windows, and the fit's error [m, rad]."""
+def progress(generation, generations, best, current, sigma, started, unit):
+    """One line per generation: the best error so far and this generation's, the step size and the time left."""
+    elapsed = time.perf_counter() - started
+    left = elapsed / generation * (generations - generation)
+    print(f"  generation {generation:3d}/{generations}: best {best:.3f}{unit}, this generation {current:.3f}{unit}, "
+          f"sigma {sigma:.3f}, {elapsed / generation:.1f} s each, {left / 60:.1f} min left", flush=True)
+
+
+def evaluate(sim, params, starts, length, weights, scale):
+    """The errors of one parameter set over the windows [m, rad], and the fit's (relative) error."""
     if len(starts) == 0:
         return {key: float("nan") for key in ("error", "tcp_position", "tcp_rotation", "joints")}
     error = errors(sim.rollout({k: v[None] for k, v in params.items()}, starts, length),
                    sim.measured(starts, length))
-    return {"error": float(cost(error, weights)[0]), **{key: float(value[0]) for key, value in error.items()}}
+    return {"error": float(cost(error, weights, scale)[0]), **{key: float(value[0]) for key, value in error.items()}}
+
+
+def plot_windows(run, length, holdout, poses):
+    """A steps window and a multisine window of the held-out pose, then of a training pose, labeled."""
+    multisine = run.meta["segments"].index("multisine")
+    out = []
+    for pose in ([holdout] if holdout in poses else []) + [p for p in poses if p != holdout]:
+        starts = run.windows(length, [pose])
+        if len(starts) == 0 or len(out) == 4:
+            continue
+        starts = starts[run.block[starts] == run.block[starts[0]]]  # the first block at the pose
+        mixed = max(starts, key=lambda start: np.mean(run.segment[start:start + length] == multisine))
+        tag = "held out" if pose == holdout else "train"
+        out += [(starts[0], f"{tag}, {pose}: steps"), (mixed, f"{tag}, {pose}: multisine")]
+    return out
+
+
+def pyplot():
+    """matplotlib.pyplot without a display, or None if it is not installed."""
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError:
+        print("  pip install matplotlib to save plots of the fit")
+        return None
+    return plt
+
+
+def draw(plt, windows, t, rows, path, title):
+    """
+    One column per window and one row per channel: rows is a list of (ylabel, {line: (values
+    (windows, samples), style)}).
+    """
+    fig, axes = plt.subplots(len(rows), len(windows), figsize=(3.4 * len(windows) + 1.2, 1.7 * len(rows) + 1),
+                             sharex=True, squeeze=False)
+    for row, (ylabel, lines) in enumerate(rows):
+        for col, (_, label) in enumerate(windows):
+            ax = axes[row, col]
+            for name, (values, style) in lines.items():
+                ax.plot(t, values[col], label=name, **style)
+            ax.grid(alpha=0.3)
+            if row == 0:
+                ax.set_title(label, fontsize=9)
+            if col == 0:
+                ax.set_ylabel(ylabel, fontsize=9)
+            ax.tick_params(labelsize=7)
+    for ax in axes[-1]:
+        ax.set_xlabel("time in the window [s]", fontsize=8)
+    axes[0, 0].legend(fontsize=7, loc="best")
+    fig.suptitle(title, fontsize=10)
+    fig.tight_layout()
+    fig.savefig(path, dpi=110)
+    plt.close(fig)
+    return path
+
+
+STYLES = {"target": dict(color="0.65", lw=1.0), "robot": dict(color="k", lw=1.8),
+          "fr3.xml": dict(color="tab:red", lw=1.1, ls="--"), "fit": dict(color="tab:blue", lw=1.2)}
+
+
+def plot_fit(sim, run, curves, windows, length, paths, title):
+    """
+    Save the response in the windows, in task space (TCP position and rotation) and in joint
+    space: target, robot and each simulated parameter set of curves ({label: params}),
+    relative to the robot's pose at the window start. Returns the files written.
+    """
+    plt = pyplot()
+    if plt is None:
+        return []
+    starts = np.array([start for start, _ in windows])
+    ticks = starts[:, None] + np.arange(sim.every, length + 1, sim.every)[None]
+    t = np.arange(1, ticks.shape[1] + 1) * sim.every / CONTROL_HZ
+    measured = sim.measured(starts, length)
+    motion = {"target": {"pos": run.ee_des[ticks][..., :3, 3], "rot": run.ee_des[ticks][..., :3, :3]},
+              "robot": measured}
+    motion.update({label: {key: value[0] for key, value in
+                           sim.rollout({k: v[None] for k, v in params.items()}, starts, length).items()}
+                   for label, params in curves.items()})
+    start_pos, start_rot = sim.tcp_poses(run.q[starts])
+    start_q = run.q[starts][:, None]
+    task = []
+    for i, axis in enumerate("xyz"):
+        task.append((f"TCP {axis} [mm]", {name: (1000 * (m["pos"][..., i] - start_pos[:, None, i]), STYLES[name])
+                                         for name, m in motion.items()}))
+    for i, axis in enumerate("xyz"):
+        task.append((f"TCP rotation {axis} [mrad]",
+                     {name: (1000 * rotvec(m["rot"] @ start_rot[:, None].swapaxes(-1, -2))[..., i], STYLES[name])
+                      for name, m in motion.items()}))
+    joints = [(f"joint {j + 1} [mrad]", {name: (1000 * (m["q"][..., j] - start_q[..., j]), STYLES[name])
+                                         for name, m in motion.items() if "q" in m}) for j in range(7)]
+    return [draw(plt, windows, t, task, paths[0], title), draw(plt, windows, t, joints, paths[1], title)]
 
 
 def configuration(run, path):
@@ -416,14 +547,19 @@ def main():
                         help="Recording of 06_collect_osc_sysid.py to fit (default: the latest of --activate)")
     parser.add_argument("--physics_dt", "--physics-dt", type=float, required=True,
                         help="Physics step of your simulation [s], a whole number of ms dividing the policy period")
+    parser.add_argument("--fixed", nargs="*", choices=tuple(SIZES), default=["armature"], metavar="NAME",
+                        help="Parameters kept at their start values, the recorded gains and fr3.xml's joint "
+                             f"parameters: any of {', '.join(SIZES)}; --fixed alone fits all of them. Fitted, the "
+                             "armature mostly trades off against the gains instead of measuring the joints")
     parser.add_argument("--mass_matrix", "--mass-matrix", choices=("nominal", "plant"), default="nominal",
-                        help="Armature in the OSC's mass matrix: fr3.xml's (as aiofranka) or the fitted one")
+                        help="With the armature fitted, the armature in the mass matrix of the OSC's Lambda and Jbar: "
+                             "fr3.xml's, as aiofranka on the robot, or the simulated joints' (each candidate's while "
+                             "fitting), for an environment that computes the OSC from its simulated model's mass matrix")
     parser.add_argument("--holdout", default="last",
                         help="Pose whose windows are left out of the fit: a pose name, last, or none")
-    parser.add_argument("--rotation_weight", "--rotation-weight", type=float, default=0.1,
-                        help="Weight of the TCP rotation error in the fit [m/rad]")
-    parser.add_argument("--joint_weight", "--joint-weight", type=float, default=0.3,
-                        help="Weight of the joint position error in the fit [m/rad]")
+    parser.add_argument("--joint_weight", "--joint-weight", type=float, default=0.8,
+                        help="Share of the joint error in the fit; the TCP's (half position, half rotation) is "
+                             "the rest. Each error counts relative to fr3.xml's on the training windows")
     parser.add_argument("--window", type=float, default=2.0, help="Window length [s]")
     parser.add_argument("--generations", type=int, default=200)
     parser.add_argument("--popsize", type=int, default=32)
@@ -431,6 +567,12 @@ def main():
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--threads", type=int, default=0, help="Simulation threads (0: all CPUs)")
     args = parser.parse_args()
+    if not 0.0 <= args.joint_weight <= 1.0:
+        parser.error("--joint_weight is a share between 0 and 1")
+    free = tuple(name for name in SIZES if name not in args.fixed)
+    fixed = [name for name in SIZES if name not in free]
+    if not free:
+        parser.error("--fixed leaves nothing to fit")
 
     if args.traj is None:
         if args.activate is None:
@@ -463,21 +605,26 @@ def main():
     print("  " + ", ".join(f"{name} {run.gains[name].tolist()}" for name in GAINS))
     print(f"  null target {'the posture each block started in' if run.null_target is None else run.null_target.tolist()}")
     print(f"  Replay check: max |recomputed - sent torque| = {sim.replay_error():.1e} Nm")
-    print(f"  physics_dt {args.physics_dt * 1000:g} ms, decimation {sim.decimation}, {args.mass_matrix} mass matrix; "
-          f"fitting {len(train)} windows of {length / CONTROL_HZ:g} s, holding out {len(test)} at {holdout}\n")
+    mass_matrix = f", {args.mass_matrix} mass matrix" if "armature" in free else ""
+    print(f"  physics_dt {args.physics_dt * 1000:g} ms, decimation {sim.decimation}{mass_matrix}; "
+          f"fitting {len(train)} windows of {length / CONTROL_HZ:g} s, holding out {len(test)} at {holdout}")
+    print(f"  Fitting {', '.join(free)}" + (f"; keeping {', '.join(fixed)} at the start values" if fixed else "") + "\n")
 
-    weights = {"rotation": args.rotation_weight, "joint": args.joint_weight}
+    weights = {"joints": args.joint_weight, "tcp": 1.0 - args.joint_weight}
+    print(f"  Error: {100 * weights['joints']:.0f}% joints, {100 * weights['tcp']:.0f}% TCP (half position, half "
+          "rotation), each relative to fr3.xml's on the training windows\n")
     base = sim.start_values()
-    params, _ = fit(sim, train, length, base, weights, args.generations, args.popsize, args.sigma, args.seed)
+    params, _, scale = fit(sim, train, length, base, free, weights, args.generations, args.popsize, args.sigma,
+                           args.seed)
 
-    results = {label: {"train": evaluate(sim, p, train, length, weights),
-                       "held_out": evaluate(sim, p, test, length, weights)}
+    results = {label: {"train": evaluate(sim, p, train, length, weights, scale),
+                       "held_out": evaluate(sim, p, test, length, weights, scale)}
                for label, p in (("start", base), ("fit", params))}
-    print(f"\n  RMS                          error [mm]   TCP position [mm]   TCP rotation [mrad]   joints [mrad]")
+    print(f"\n  RMS                          error   TCP position [mm]   TCP rotation [mrad]   joints [mrad]")
     for label, result in results.items():
         for split, e in result.items():
             name = f"{label}, {split.replace('_', ' ')}" + (f" ({holdout})" if split == "held_out" else "")
-            print(f"  {name:28s} {1000 * e['error']:6.2f}   {1000 * e['tcp_position']:17.2f}"
+            print(f"  {name:28s} {e['error']:5.3f}   {1000 * e['tcp_position']:17.2f}"
                   f"   {1000 * e['tcp_rotation']:19.2f}   {1000 * e['joints']:13.2f}")
     print("\n  axis   ee_kp              ee_kd")
     for i, axis in enumerate(("x", "y", "z", "rx", "ry", "rz")):
@@ -487,11 +634,21 @@ def main():
         print(f"  {j + 1}      " + "  ".join(f"{base[n][j]:6.3g} -> {params[n][j]:<6.3g}"
                                           for n in ("null_kp", "null_kd") + PHYSICAL))
 
-    scale = {"error": 1000, "tcp_position": 1000, "tcp_rotation": 1000, "joints": 1000}
+    stem = args.traj.with_name(f"{args.traj.stem}_fit_{1000 * args.physics_dt:g}ms")
+    before, after = results["start"]["held_out"], results["fit"]["held_out"]
+    plots = plot_fit(sim, run, {"fr3.xml": base, "fit": params}, plot_windows(run, length, holdout, recorded),
+                     length, [stem.with_name(f"{stem.name}_task.png"), stem.with_name(f"{stem.name}_joints.png")],
+                     f"{args.traj.name}, physics_dt {1000 * args.physics_dt:g} ms: held-out TCP "
+                     f"{1000 * before['tcp_position']:.2f} -> {1000 * after['tcp_position']:.2f} mm, "
+                     f"{1000 * before['tcp_rotation']:.1f} -> {1000 * after['tcp_rotation']:.1f} mrad, "
+                     f"joints {1000 * before['joints']:.2f} -> {1000 * after['joints']:.2f} mrad")
+    for plot in plots:
+        print(f"\n  Saved the response curves: {plot}")
+    units = {"error": 1, "tcp_position": 1000, "tcp_rotation": 1000, "joints": 1000}
     save_sim(config_path, {
         "physics_dt": args.physics_dt,
         **{name: params[name] for name in GAINS},
-        "mass_matrix": args.mass_matrix,  # armature in the OSC's mass matrix: fr3.xml's (nominal) or the fitted
+        "mass_matrix": args.mass_matrix,  # armature in the OSC's mass matrix: fr3.xml's (nominal) or the joints' (plant)
         "mass_matrix_armature": sim.nominal_armature if args.mass_matrix == "nominal" else params["armature"],
         **{name: params[name] for name in PHYSICAL},
         # The payload the fit assumed, merged into fr3_link7 as aiofranka.robot.merge_payload() does.
@@ -503,8 +660,11 @@ def main():
             "plant": "mujoco" if run.meta.get("sim") else "robot",
             "tool": run.meta.get("tool"),
             "weights": weights,
-            "rms_mm_mrad": {label: {split: {key: scale[key] * value for key, value in e.items()}
+            "fixed": fixed,
+            "relative_to_mm_mrad": {key: 1000 * value for key, value in scale.items()},
+            "rms_mm_mrad": {label: {split: {key: units[key] * value for key, value in e.items()}
                                     for split, e in result.items()} for label, result in results.items()},
+            **({"plots": [os.path.relpath(p.resolve(), config_path.resolve().parent) for p in plots]} if plots else {}),
         },
     }, controller=recorded_controller)
     print(f"\n  Added the fit for physics_dt {args.physics_dt:g} to {config_path}\n")

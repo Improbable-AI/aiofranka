@@ -52,8 +52,10 @@ class FrankaController:
         kd (np.ndarray): Joint damping [Nm⋅s/rad] (7,)
         
         # OSC gains
-        ee_kp (np.ndarray): EE stiffness [N/m for xyz, Nm/rad for rpy] (6,)
-        ee_kd (np.ndarray): EE damping [N⋅s/m for xyz, Nm⋅s/rad for rpy] (6,)
+        ee_kp (np.ndarray): EE stiffness as an acceleration gain [1/s²] (6,): the OSC
+            commands the wrench Λ·(ee_kp·e − ee_kd·v), with Λ the task-space inertia, so
+            ee_kp = ω² and ee_kd = 2ζω for a natural frequency ω and damping ratio ζ
+        ee_kd (np.ndarray): EE damping as an acceleration gain [1/s] (6,)
         null_kp (np.ndarray): Null-space stiffness [Nm/rad] (7,)
         null_kd (np.ndarray): Null-space damping [Nm⋅s/rad] (7,)
         

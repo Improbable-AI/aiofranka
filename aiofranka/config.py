@@ -5,8 +5,9 @@ A file names the controller mode, its gains, the policy rate and the tool it is 
 
     mode: osc
     tool: test panda hand               # Desk end-effector profile, or none (optional)
-    ee_kp: [100, 100, 100, 30, 30, 30]  # x, y, z [N/m] and rotation [Nm/rad], or one value for all
-    ee_kd: 20                           # [N s/m, Nm s/rad]
+    ee_kp: [100, 100, 100, 30, 30, 30]  # x, y, z, then rotation [1/s^2], or one value for all
+    ee_kd: 20                           # [1/s]; the OSC multiplies both by the task-space
+                                        # inertia, so ee_kp = w^2, ee_kd = 2 zeta w
     null_kp: 9                          # null space [Nm/rad], one value or one per joint (default 1)
     null_kd: 6                          # [Nm s/rad] (default 1)
     null_target: home                   # 7 joint positions [rad], home, or current (the default): the
