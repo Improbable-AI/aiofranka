@@ -7,6 +7,7 @@ Usage:
     aiofranka status [--ip IP]
     aiofranka mode [--set MODE]
     aiofranka log [-n LINES] [--follow]
+    aiofranka camera calibrate|fit
 """
 
 import argparse
@@ -1246,6 +1247,75 @@ def cmd_tool(args):
         print(f"\n  {RED}Error:{RST} {e}\n")
 
 
+def cmd_camera(args):
+    try:
+        from aiofranka import camera
+    except ImportError as e:
+        print(f"\n  {RED}Error:{RST} {e}. Install the camera extra: "
+              f"{BOLD}pip install 'aiofranka[camera]'{RST}\n")
+        return
+    from pathlib import Path
+
+    try:
+        if args.camera_command == "fit":
+            print(f"\n  {BOLD}aiofranka{RST} {DIM}|{RST} camera fit {DIM}({args.session}){RST}\n")
+            _print_calibration(camera.fit_session(args.session), Path(args.session))
+            return
+
+        from aiofranka.server import _DeskClientV2, _clear_token
+
+        robot_ip = _resolve_ip(args.ip)
+        username, password = _resolve_credentials(args)
+        print(f"\n  {BOLD}aiofranka{RST} {DIM}|{RST} camera calibrate {DIM}({robot_ip}){RST}\n")
+        pid = _check_server_running(robot_ip)
+        if pid is not None:
+            print(f"  {RED}Error:{RST} A server (PID {pid}) is connected to the robot. "
+                  f"Stop it with {BOLD}aiofranka stop{RST} first.\n")
+            return
+        client = _DeskClientV2(robot_ip, username, password, protocol=args.protocol)
+        _cli_take_control(client, robot_ip)
+        try:
+            session = camera.calibrate(robot_ip, stream=args.stream, cube=args.cube or camera.CUBE,
+                                       out=args.out, damping=args.damping)
+        finally:
+            try:
+                _cli_run_with_spinner("Releasing control token", 1, 1, client.release_token)
+                _clear_token(robot_ip)
+            except Exception:
+                pass
+        if (session / "calibration.json").exists():
+            _print_calibration(json.loads((session / "calibration.json").read_text()), session)
+        else:
+            print(f"\n  Stopped before fitting. The views are in {session}; fit them with:\n"
+                  f"    {BOLD}aiofranka camera fit {session}{RST}\n")
+    except KeyboardInterrupt:
+        print()
+    except Exception as e:
+        print(f"\n  {RED}Error:{RST} {e}\n")
+
+
+def _print_calibration(calibration, session):
+    """Where the camera and the cube are, and how well the fit reprojects the views."""
+    import numpy as np
+
+    camera = np.array(calibration["T_base_camera"])
+    cube = np.array(calibration["T_ee_cube"])
+    metrics = calibration["metrics"]
+    held_out, everything = metrics["held_out"], metrics["all_views"]
+    worst = sorted(everything["per_view"], key=lambda view: -view["rms_px"])[:3]
+    print(f"  Camera ......... at {np.round(camera[:3, 3], 3).tolist()} m, "
+          f"looking along {np.round(camera[:3, 2], 2).tolist()} (base frame)")
+    print(f"  Cube on flange . at {np.round(cube[:3, 3], 3).tolist()} m")
+    print(f"  Error .......... {held_out['rms_px']:.2f} px on {held_out['view_count']} held-out views, "
+          f"{everything['rms_px']:.2f} px on all {everything['view_count']}")
+    print(f"  Worst views .... " + ", ".join(f"{view['view_index']}: {view['rms_px']:.2f} px" for view in worst))
+    print(f"  Saved .......... {session / 'calibration.json'}")
+    if held_out["rms_px"] > 2.0:
+        print(f"\n  {YELLOW}The held-out error is above 2 px.{RST} Check the worst views' images, "
+              "or capture more varied poses.")
+    print()
+
+
 def _check_server_running(robot_ip: str) -> int | None:
     """Return PID if a server is running for this IP, else None."""
     from aiofranka.ipc import pid_file_for_ip
@@ -2406,6 +2476,28 @@ def main():
                                  help="Only save the profile, without activating it")
     p_tool_identify.add_argument("-y", "--yes", action="store_true", help="Do not ask before moving or saving")
 
+    # camera
+    p_camera = subparsers.add_parser(
+        "camera", help="Calibrate a fixed camera against the robot (pip install 'aiofranka[camera]')")
+    camera_sub = p_camera.add_subparsers(dest="camera_command")
+    p_camera_calibrate = camera_sub.add_parser(
+        "calibrate", help="Capture views of the calibration cube while moving the arm by hand, and fit")
+    p_camera_calibrate.add_argument("--ip", type=str, default=None, help="Robot IP")
+    p_camera_calibrate.add_argument("--username", type=str, default="admin", help="Robot web UI username")
+    p_camera_calibrate.add_argument("--password", type=str, default="admin", help="Robot web UI password")
+    p_camera_calibrate.add_argument("--protocol", type=str, default="https", choices=["http", "https"])
+    p_camera_calibrate.add_argument("--stream", type=str, default=None,
+                                    help="aiocamera stream, e.g. rs_SERIAL_color (default: the only "
+                                         "RealSense color stream)")
+    p_camera_calibrate.add_argument("--cube", type=str, default=None,
+                                    help="AprilCube config.json (default: aprilcube's calibration cube)")
+    p_camera_calibrate.add_argument("--out", type=str, default="camera_calibration",
+                                    help="Folder for the session folder (default: camera_calibration)")
+    p_camera_calibrate.add_argument("--damping", type=float, default=1.0,
+                                    help="Joint damping while moved by hand in Nm s/rad (default: 1)")
+    p_camera_fit = camera_sub.add_parser("fit", help="Fit a recorded session again")
+    p_camera_fit.add_argument("session", help="Session folder with views.json")
+
     # log
     p_log = subparsers.add_parser("log", help="View server log")
     p_log.add_argument("-n", type=int, default=20, help="Number of lines to show (default: 20)")
@@ -2462,6 +2554,11 @@ def main():
             p_tool.print_help()
         else:
             cmd_tool(args)
+    elif args.command == "camera":
+        if args.camera_command is None:
+            p_camera.print_help()
+        else:
+            cmd_camera(args)
     elif args.command == "log":
         cmd_log(args)
     elif args.command == "gripper":

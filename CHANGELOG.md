@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Highlights
+
+- Add `aiofranka camera calibrate` and `aiofranka camera fit` to locate a fixed camera relative to the robot with an AprilCube held on the flange: the arm is moved by hand in damped gravity compensation, views are captured by themselves whenever it rests at a new pose, and a terminal view shows the cube and the image regions still without a view. The fit writes `calibration.json` with `T_base_camera`, `T_ee_cube`, the intrinsics and held-out reprojection errors. Install with `pip install "aiofranka[camera]"`; the default cube is aprilcube's printable calibration cube.
+
 ## 0.5.1 - 2026-09-28
 
 ### Highlights

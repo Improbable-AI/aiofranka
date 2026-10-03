@@ -48,6 +48,11 @@ robotiq = [
     "minimalmodbus",
     "pyrobotiqgripper",
 ]
+# aiofranka camera calibrate: aiocamera serves the frames, aprilcube detects the cube.
+camera = [
+    "aprilcube>=0.3",
+    "aiocamera[realsense]>=0.1",
+]
 
 [project.urls]
 Homepage = "https://github.com/younghyopark/aiofranka"
@@ -63,6 +68,7 @@ namespaces = false
 
 [tool.setuptools.package-data]
 aiofranka = [
+    "calibration_cube.json",
     "model/fr3.xml",
     "model/scene.xml",
     "model/assets/link*_*.obj",

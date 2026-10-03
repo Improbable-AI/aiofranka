@@ -33,6 +33,12 @@ This works on:
 | Linux x86_64, e.g. Ubuntu 22.04 or newer | 3.10 to 3.12 |
 | Apple Silicon Mac with macOS 15 or newer | 3.10 to 3.14 |
 
+To calibrate a camera against the robot (`aiofranka camera`), add the camera extra, which installs [aiocamera](https://github.com/younghyopark/aiocamera) and [aprilcube](https://github.com/younghyopark/aprilcube):
+
+```bash
+pip install "aiofranka[camera]"
+```
+
 Or for development:
 ```bash
 git clone https://github.com/younghyopark/aiofranka.git
@@ -142,6 +148,7 @@ aiofranka stop     [--ip IP]              Stop a running server
 aiofranka mode     [--ip IP] [--set MODE] View/change operating mode
 aiofranka config   [--ip IP] [--mass M]   View/set the active end-effector profile
 aiofranka tool     identify|load|unload|list|remove   Identify and switch tools
+aiofranka camera   calibrate|fit          Locate a fixed camera relative to the robot
 aiofranka selftest [--ip IP] [--force]    Run safety self-tests
 aiofranka log      [-n LINES] [-f]        View server logs
 aiofranka gripper  --open|--close          Control the Robotiq gripper
@@ -236,6 +243,19 @@ estimate = await controller.identify_payload(tool_length=0.2)   # moves the robo
 aiofranka.save_tool("gripper", estimate.mass, estimate.com)
 aiofranka.load_tool("gripper")
 ```
+
+### `camera`
+
+Locates a fixed camera in the robot's base frame, for example to track objects in the robot's coordinates. The arm holds an AprilCube on its flange: print aprilcube's calibration cube ([cube.3mf](https://github.com/younghyopark/aprilcube/blob/main/models/calibration_cube/cube.3mf), 1x3x3 with 24 mm tags) and mount it with its connector. Start the camera with `aiocamera start`, set the cube's mass as the active Desk profile (`aiofranka tool identify`), then:
+
+```bash
+aiofranka camera calibrate              # move the arm by hand; captures and fits into camera_calibration/<date>/
+aiofranka camera fit camera_calibration/20261003_150000   # fit a recorded session again
+```
+
+`camera calibrate` puts the arm in gravity compensation with light damping (`--damping`, default 1 Nm s/rad) and shows a live view of the camera image in the terminal: the cube in view, the views captured so far, and which image regions still have none. Move the arm by hand and let it rest: whenever it has been still for 0.7 s at a new pose, at least 5 cm or 10 deg from every captured one, with the cube in view, it records the cube's tag corners in a fresh frame with the flange pose and beeps. Space captures anyway, `u` removes the last view, `q` quits keeping the views. Aim for 15 to 25 views spread over the image, near and far, with the wrist turned 20 to 40 deg about at least two axes. Enter fits.
+
+The fit finds the camera's pose in the base frame and the cube's on the flange that best reproject the cube's corners in every view, with the stream's factory intrinsics fixed. Every fifth view is held out of a first fit to report the error on views it has not seen. The session folder keeps `views.json` and the images, so `camera fit` can refit it, and `calibration.json` holds `T_base_camera` (meters; camera axes right, down, forward), `T_ee_cube`, the intrinsics and the errors. The camera is the only RealSense color stream in aiocamera unless `--stream` names one; `--cube` takes another AprilCube's `config.json`.
 
 ### `selftest`
 

@@ -1,6 +1,7 @@
 include README.md
 include LICENSE
 include CHANGELOG.md
+include aiofranka/calibration_cube.json
 include aiofranka/model/fr3.xml
 include aiofranka/model/scene.xml
 include aiofranka/model/LICENSE
