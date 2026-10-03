@@ -145,7 +145,7 @@ aiofranka gravcomp [--ip IP] [--damping]  Gravity compensation (freedrive)
 aiofranka home     [--ip IP]              Move the robot to its home pose
 aiofranka status   [--ip IP]              Show robot & server status
 aiofranka stop     [--ip IP]              Stop a running server
-aiofranka mode     [--ip IP] [--set MODE] View/change operating mode
+aiofranka mode     [--ip IP] [program|execute]  View/change operating mode
 aiofranka config   [--ip IP] [--mass M]   View/set the active end-effector profile
 aiofranka tool     identify|load|unload|list|remove   Identify and switch tools
 aiofranka camera   calibrate|fit          Locate a fixed camera relative to the robot
@@ -157,7 +157,7 @@ aiofranka rt-benchmark [--duration SEC]    Benchmark the 1 kHz control loop
 
 ### `unlock` / `lock`
 
-Unlock opens the brakes and activates FCI so the robot is ready for torque control. Lock does the reverse. Credentials are prompted on first use and saved to `~/.aiofranka/config.json`.
+Unlock opens the brakes and activates FCI so the robot is ready for torque control. It first recovers safety errors, runs the self-tests if they are overdue, and switches from Programming back to Execution. Lock does the reverse. Credentials are prompted on first use and saved to `~/.aiofranka/config.json`.
 
 ```bash
 # Unlock before running your script
@@ -203,11 +203,12 @@ aiofranka stop
 
 ### `mode`
 
-View or change the operating mode. `Execution` is needed for FCI control. `Programming` enables freedrive via the pilot interface button near the end-effector.
+View or change the operating mode. `Execution` is needed for FCI control. `Programming` enables freedrive via the pilot interface button near the end-effector, as Desk's mode switch does: `aiofranka mode program` deactivates FCI, opens the brakes if they are closed, and hands the control token back to Desk. `aiofranka unlock` switches back to Execution by itself.
 
 ```bash
-aiofranka mode                  # view current mode
-aiofranka mode --set Execution  # switch to FCI mode
+aiofranka mode            # view current mode
+aiofranka mode program    # switch to Programming, to hand-guide the robot
+aiofranka mode execute    # switch back to Execution, for FCI
 ```
 
 ### `config`

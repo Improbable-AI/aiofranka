@@ -884,14 +884,32 @@ class _DeskClientV2:
         return ""
 
     def change_operating_mode(self, mode: str = "Execution"):
-        """Change the operating mode (currently only "Execution" is supported)."""
+        """Change the operating mode to "Execution" or "Programming" (needs the control token).
+
+        The Desk API only changes to Execution. Programming goes through the endpoint of
+        the Desk web UI's mode switch, which takes the UI's login cookie.
+        """
         def _do():
-            r = self._req("POST", "/api/system/operating-mode:change",
-                           json={"desiredOperatingMode": mode},
-                           headers=self._headers())
+            if mode == "Execution":
+                r = self._req("POST", "/api/system/operating-mode:change",
+                               json={"desiredOperatingMode": mode},
+                               headers=self._headers())
+            else:
+                r = self._req("POST", f"/desk/api/operating-mode/{mode.lower()}",
+                               headers={"X-Control-Token": self._token},
+                               cookies={"authorization": self._login_cookie()})
             self._check(r, "change_operating_mode")
             logger.info(f"Operating mode changed to {mode}")
         self._with_retry(_do, context="change_operating_mode")
+
+    def _login_cookie(self) -> str:
+        """Log in as the Desk web UI does, for the endpoints only the UI uses."""
+        from aiofranka.client import FrankaClient
+        r = self._req("POST", "/admin/api/login",
+                       json={"login": self._username,
+                             "password": FrankaClient._encode_password(self._username, self._password)})
+        self._check(r, "login")
+        return r.text
 
     # ── Arm info ─────────────────────────────────────────────────────
 
@@ -936,6 +954,10 @@ def _unlock_robot(robot_ip: str, username: str = "admin", password: str = "admin
             client.execute_self_tests()
             logger.info("Self-tests completed")
             step += 1
+
+        # FCI only activates in Execution, e.g. not after hand guiding in Programming
+        if client.get_operating_mode() == "Programming":
+            client.change_operating_mode("Execution")
 
         if on_progress:
             on_progress(step, "Unlocking joints")
@@ -1982,6 +2004,9 @@ def unlock(ip: str = None, *, username: str = None, password: str = None,
            protocol: str = "https") -> None:
     """Unlock the robot joints (open brakes) and activate FCI.
 
+    It first recovers safety errors, runs the self-tests if they are overdue and
+    switches from Programming to Execution, where FCI runs.
+
     The control token is kept (saved to disk) so FCI stays active.
     Call lock() to deactivate FCI, lock joints, and release the token.
 
@@ -2029,6 +2054,11 @@ def unlock(ip: str = None, *, username: str = None, password: str = None,
     if self_test_due:
         total += 1  # extra step for self-tests
 
+    # FCI only activates in Execution: switch back from Programming (hand guiding)
+    programming = client.get_operating_mode() == "Programming"
+    if programming:
+        total += 1  # extra step for the switch
+
     if client._token is None:
         _run_with_spinner("Acquiring control token", 1, total,
                           lambda: client._with_retry(
@@ -2050,6 +2080,11 @@ def unlock(ip: str = None, *, username: str = None, password: str = None,
         if self_test_due:
             _run_with_spinner("Running self-tests (overdue)", step, total,
                               client.execute_self_tests)
+            step += 1
+
+        if programming:
+            _run_with_spinner("Switching to Execution", step, total,
+                              client.change_operating_mode, "Execution")
             step += 1
 
         # Unlock joints

@@ -12,7 +12,7 @@ The CLI handles robot setup, server lifecycle, and diagnostics.
    aiofranka home     [--ip IP]              Move the robot to its home pose
    aiofranka status   [--ip IP]              Show robot & server status
    aiofranka stop     [--ip IP]              Stop a running server
-   aiofranka mode     [--ip IP] [--set MODE] View/change operating mode
+   aiofranka mode     [--ip IP] [program|execute]  View/change operating mode
    aiofranka config   [--ip IP] [--mass M]   View/set end-effector config
    aiofranka tool     identify|load|list ... Identify, save and load tools
    aiofranka camera   calibrate|fit          Locate a fixed camera relative to the robot
@@ -25,7 +25,8 @@ unlock / lock
 -------------
 
 Unlock opens the brakes and activates FCI so the robot is ready for torque control.
-Lock does the reverse. Credentials are prompted on first use and saved to ``~/.aiofranka/config.json``.
+It first recovers safety errors, runs the self-tests if they are overdue, and switches
+from Programming back to Execution. Lock does the reverse. Credentials are prompted on first use and saved to ``~/.aiofranka/config.json``.
 
 .. code-block:: bash
 
@@ -80,12 +81,16 @@ mode
 ----
 
 View or change the operating mode. ``Execution`` is needed for FCI control.
-``Programming`` enables freedrive via the pilot interface button near the end-effector.
+``Programming`` enables freedrive via the pilot interface button near the end-effector,
+as Desk's mode switch does: ``aiofranka mode program`` deactivates FCI, opens the brakes
+if they are closed, and hands the control token back to Desk. ``aiofranka unlock``
+switches back to Execution by itself.
 
 .. code-block:: bash
 
-   aiofranka mode                  # view current mode
-   aiofranka mode --set Execution  # switch to FCI mode
+   aiofranka mode            # view current mode
+   aiofranka mode program    # switch to Programming, to hand-guide the robot
+   aiofranka mode execute    # switch back to Execution, for FCI
 
 config
 ------
