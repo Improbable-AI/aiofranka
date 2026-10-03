@@ -1,10 +1,21 @@
 # Changelog
 
-## Unreleased
+## 0.6.0 - 2026-10-03
 
 ### Highlights
 
 - Add `aiofranka camera calibrate` and `aiofranka camera fit` to locate a fixed camera relative to the robot with an AprilCube held on the flange: the arm is moved by hand in damped gravity compensation, views are captured by themselves whenever it rests at a new pose, and a terminal view shows the cube and the image regions still without a view. The fit writes `calibration.json` with `T_base_camera`, `T_ee_cube`, the intrinsics and held-out reprojection errors. Install with `pip install "aiofranka[camera]"`; the default cube is aprilcube's printable calibration cube.
+- Manage Desk end-effector profiles as tools, from Python (`save_tool`, `load_tool`, `unload_tool`, `list_tools`, `remove_tool`) and the CLI (`aiofranka tool identify|load|unload|list|remove`). `aiofranka tool identify` and `controller.identify_payload()` estimate the tool's mass and center of mass from the joint torques at rest, approaching each pose from both sides. `aiofranka status` shows the active profile.
+- Keep how a policy drives the robot in a controller configuration file: the mode, gains, null-space target, TCP, policy rate and the Desk tool it needs. `aiofranka.load_config()` reads and checks it, and `controller.activate()` applies it. It refuses if the tool is not the active Desk profile, or if the arm is farther than `arrival_tolerance` from the configuration's null-space target. `configs/` has examples, including system-identified OSC configurations of three Pocky sticks.
+- `controller.set_tcp()` sets the tool center point the OSC controls, and `last_command` keeps the torque actually sent.
+- Add system identification examples. `04_collect_joint_sysid.py` and `06_collect_osc_sysid.py` record steps, multisines and ramps with a policy's gains and rate. `05_fit_joint_sysid.py` and `07_fit_osc_sysid.py` fit the controller gains and each joint's armature, damping and friction loss in batched MuJoCo with CMA-ES, holding out one pose, and add the fit to the configuration's `sim` section.
+
+### Changes
+
+- `RobotInterface` clears any load set by an earlier connection, merges the payload the robot compensates into the MuJoCo model, and reads the active Desk profile once when it connects (read-only, 3 s timeout; the server skips it).
+- `move()` ends on the exact target and waits until every joint is within `arrival_tolerance` (0.03 rad, at most 3 s). It plays its trajectory at 50 Hz whatever `set_freq()` says.
+- Depend on pyyaml, and add the optional `camera` extra (aiocamera and aprilcube).
+- The docs take their version from `pyproject.toml`. The repository moved to younghyopark/aiofranka.
 
 ## 0.5.1 - 2026-09-28
 

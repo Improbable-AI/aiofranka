@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Index &mdash; aiofranka 0.5.1 documentation</title>
+  <title>Index &mdash; aiofranka 0.6.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=b9afe91b"></script>
+      <script src="_static/documentation_options.js?v=8fa8b3e9"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/js/theme.js"></script>
@@ -54,6 +54,8 @@
 <li class="toctree-l1"><a class="reference internal" href="api/remote.html">FrankaRemoteController (Server Mode)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/controller.html">Franka Controller</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/robot.html">Robot Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/payload.html">Payload Identification and Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/config.html">Controller Configurations</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/server.html">Server Functions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/gripper.html">GripperController</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/utilities.html">Async Utilities</a></li>
@@ -88,6 +90,7 @@
 <div class="genindex-jumpbox">
  <a href="#_"><strong>_</strong></a>
  | <a href="#A"><strong>A</strong></a>
+ | <a href="#B"><strong>B</strong></a>
  | <a href="#C"><strong>C</strong></a>
  | <a href="#D"><strong>D</strong></a>
  | <a href="#E"><strong>E</strong></a>
@@ -121,11 +124,15 @@
 </li>
         <li><a href="api/gripper.html#aiofranka.gripper.GripperController.__init__">(aiofranka.gripper.GripperController method)</a>
 </li>
+        <li><a href="api/payload.html#aiofranka.payload.PayloadEstimate.__init__">(aiofranka.payload.PayloadEstimate method)</a>
+</li>
         <li><a href="api/remote.html#aiofranka.remote.FrankaRemoteController.__init__">(aiofranka.remote.FrankaRemoteController method)</a>
 </li>
         <li><a href="api/remote.html#aiofranka.remote.ServerDiedError.__init__">(aiofranka.remote.ServerDiedError method)</a>
 </li>
         <li><a href="api/robot.html#aiofranka.robot.RobotInterface.__init__">(aiofranka.robot.RobotInterface method)</a>
+</li>
+        <li><a href="api/payload.html#aiofranka.tools.Tool.__init__">(aiofranka.tools.Tool method)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -134,11 +141,26 @@
 <h2 id="A">A</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/controller.html#aiofranka.controller.FrankaController.activate">activate() (aiofranka.controller.FrankaController method)</a>
+</li>
+      <li><a href="api/payload.html#aiofranka.tools.Tool.active">active (aiofranka.tools.Tool attribute)</a>, <a href="api/payload.html#id18">[1]</a>
+</li>
+      <li><a href="api/payload.html#aiofranka.tools.active_tool">active_tool() (in module aiofranka.tools)</a>
+</li>
+      <li><a href="api/config.html#aiofranka.config.add_recording">add_recording() (in module aiofranka.config)</a>
+</li>
       <li>
     aiofranka.async_utils
 
       <ul>
         <li><a href="api/utilities.html#module-aiofranka.async_utils">module</a>
+</li>
+      </ul></li>
+      <li>
+    aiofranka.config
+
+      <ul>
+        <li><a href="api/config.html#module-aiofranka.config">module</a>
 </li>
       </ul></li>
       <li>
@@ -158,6 +180,13 @@
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li>
+    aiofranka.payload
+
+      <ul>
+        <li><a href="api/payload.html#module-aiofranka.payload">module</a>
+</li>
+      </ul></li>
+      <li>
     aiofranka.remote
 
       <ul>
@@ -171,6 +200,13 @@
         <li><a href="api/robot.html#module-aiofranka.robot">module</a>
 </li>
       </ul></li>
+      <li>
+    aiofranka.tools
+
+      <ul>
+        <li><a href="api/payload.html#module-aiofranka.tools">module</a>
+</li>
+      </ul></li>
       <li><a href="api/utilities.html#aiofranka.async_utils.async_input">async_input() (in module aiofranka.async_utils)</a>
 </li>
       <li><a href="api/utilities.html#aiofranka.async_utils.asyncify">asyncify() (in module aiofranka.async_utils)</a>
@@ -178,15 +214,37 @@
   </ul></td>
 </tr></table>
 
+<h2 id="B">B</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/payload.html#aiofranka.payload.PayloadEstimate.bias">bias (aiofranka.payload.PayloadEstimate attribute)</a>, <a href="api/payload.html#id5">[1]</a>
+</li>
+  </ul></td>
+</tr></table>
+
 <h2 id="C">C</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/controller.html#aiofranka.controller.FrankaController.check_tool">check_tool() (aiofranka.controller.FrankaController method)</a>
+</li>
       <li><a href="api/controller.html#aiofranka.controller.FrankaController.clip">clip (aiofranka.controller.FrankaController attribute)</a>
 </li>
       <li><a href="api/gripper.html#aiofranka.gripper.GripperController.close">close() (aiofranka.gripper.GripperController method)</a>
 </li>
+      <li><a href="api/payload.html#aiofranka.payload.PayloadEstimate.com">com (aiofranka.payload.PayloadEstimate attribute)</a>, <a href="api/payload.html#id1">[1]</a>
+
+      <ul>
+        <li><a href="api/payload.html#aiofranka.tools.Tool.com">(aiofranka.tools.Tool attribute)</a>, <a href="api/payload.html#id13">[1]</a>
+</li>
+      </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/payload.html#aiofranka.payload.PayloadEstimate.com_std">com_std (aiofranka.payload.PayloadEstimate attribute)</a>, <a href="api/payload.html#id3">[1]</a>
+</li>
+      <li><a href="api/payload.html#aiofranka.payload.PayloadEstimate.condition">condition (aiofranka.payload.PayloadEstimate attribute)</a>, <a href="api/payload.html#id8">[1]</a>
+</li>
+      <li><a href="api/controller.html#aiofranka.controller.FrankaController.control_transform">control_transform (aiofranka.controller.FrankaController attribute)</a>
+</li>
       <li><a href="api/utilities.html#aiofranka.async_utils.CudaInferenceThread">CudaInferenceThread (class in aiofranka.async_utils)</a>
 </li>
       <li><a href="api/gripper.html#aiofranka.gripper.GripperController.current_position">current_position (aiofranka.gripper.GripperController property)</a>
@@ -198,6 +256,10 @@
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api/robot.html#aiofranka.robot.RobotInterface.data">data (aiofranka.robot.RobotInterface attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/payload.html#aiofranka.tools.Tool.device">device (aiofranka.tools.Tool attribute)</a>, <a href="api/payload.html#id17">[1]</a>
 </li>
   </ul></td>
 </tr></table>
@@ -223,6 +285,8 @@
 <h2 id="F">F</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/payload.html#aiofranka.payload.fit_payload">fit_payload() (in module aiofranka.payload)</a>
+</li>
       <li><a href="api/gripper.html#aiofranka.gripper.GripperController.force">force (aiofranka.gripper.GripperController property)</a>
 </li>
   </ul></td>
@@ -245,12 +309,22 @@
 <h2 id="I">I</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/payload.html#aiofranka.tools.Tool.id">id (aiofranka.tools.Tool attribute)</a>, <a href="api/payload.html#id19">[1]</a>
+</li>
+      <li><a href="api/controller.html#aiofranka.controller.FrankaController.identify_payload">identify_payload() (aiofranka.controller.FrankaController method)</a>
+
+      <ul>
+        <li><a href="api/payload.html#aiofranka.payload.identify_payload">(in module aiofranka.payload)</a>
+</li>
+      </ul></li>
+      <li><a href="api/payload.html#aiofranka.tools.Tool.inertia">inertia (aiofranka.tools.Tool attribute)</a>, <a href="api/payload.html#id14">[1]</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api/remote.html#aiofranka.remote.FrankaRemoteController.initial_ee">initial_ee (aiofranka.remote.FrankaRemoteController property)</a>
 </li>
       <li><a href="api/remote.html#aiofranka.remote.FrankaRemoteController.initial_qpos">initial_qpos (aiofranka.remote.FrankaRemoteController property)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api/controller.html#aiofranka.controller.FrankaController.initialize">initialize() (aiofranka.controller.FrankaController method)</a>
 
       <ul>
@@ -275,6 +349,20 @@
 <h2 id="L">L</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/controller.html#aiofranka.controller.FrankaController.last_command">last_command (aiofranka.controller.FrankaController attribute)</a>
+</li>
+      <li><a href="api/config.html#aiofranka.config.latest_recording">latest_recording() (in module aiofranka.config)</a>
+</li>
+      <li><a href="api/robot.html#aiofranka.robot.link_inertial">link_inertial() (in module aiofranka.robot)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/payload.html#aiofranka.tools.list_tools">list_tools() (in module aiofranka.tools)</a>
+</li>
+      <li><a href="api/config.html#aiofranka.config.load_config">load_config() (in module aiofranka.config)</a>
+</li>
+      <li><a href="api/payload.html#aiofranka.tools.load_tool">load_tool() (in module aiofranka.tools)</a>
+</li>
       <li><a href="api/server.html#aiofranka.server.lock">lock() (in module aiofranka.server)</a>
 </li>
   </ul></td>
@@ -283,6 +371,16 @@
 <h2 id="M">M</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/payload.html#aiofranka.payload.PayloadEstimate.mass">mass (aiofranka.payload.PayloadEstimate attribute)</a>, <a href="api/payload.html#id0">[1]</a>
+
+      <ul>
+        <li><a href="api/payload.html#aiofranka.tools.Tool.mass">(aiofranka.tools.Tool attribute)</a>, <a href="api/payload.html#id12">[1]</a>
+</li>
+      </ul></li>
+      <li><a href="api/payload.html#aiofranka.payload.PayloadEstimate.mass_std">mass_std (aiofranka.payload.PayloadEstimate attribute)</a>, <a href="api/payload.html#id2">[1]</a>
+</li>
+      <li><a href="api/robot.html#aiofranka.robot.merge_payload">merge_payload() (in module aiofranka.robot)</a>
+</li>
       <li><a href="api/robot.html#aiofranka.robot.RobotInterface.model">model (aiofranka.robot.RobotInterface attribute)</a>
 </li>
       <li>
@@ -291,13 +389,19 @@
       <ul>
         <li><a href="api/utilities.html#module-aiofranka.async_utils">aiofranka.async_utils</a>
 </li>
+        <li><a href="api/config.html#module-aiofranka.config">aiofranka.config</a>
+</li>
         <li><a href="api/controller.html#module-aiofranka.controller">aiofranka.controller</a>
 </li>
         <li><a href="api/gripper.html#module-aiofranka.gripper">aiofranka.gripper</a>
 </li>
+        <li><a href="api/payload.html#module-aiofranka.payload">aiofranka.payload</a>
+</li>
         <li><a href="api/remote.html#module-aiofranka.remote">aiofranka.remote</a>
 </li>
         <li><a href="api/robot.html#module-aiofranka.robot">aiofranka.robot</a>
+</li>
+        <li><a href="api/payload.html#module-aiofranka.tools">aiofranka.tools</a>
 </li>
       </ul></li>
   </ul></td>
@@ -316,10 +420,12 @@
 <h2 id="N">N</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="api/controller.html#aiofranka.controller.FrankaController.null_kd">null_kd (aiofranka.controller.FrankaController attribute)</a>
+      <li><a href="api/payload.html#aiofranka.tools.Tool.name">name (aiofranka.tools.Tool attribute)</a>, <a href="api/payload.html#id11">[1]</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/controller.html#aiofranka.controller.FrankaController.null_kd">null_kd (aiofranka.controller.FrankaController attribute)</a>
+</li>
       <li><a href="api/controller.html#aiofranka.controller.FrankaController.null_kp">null_kp (aiofranka.controller.FrankaController attribute)</a>
 </li>
   </ul></td>
@@ -336,10 +442,16 @@
 <h2 id="P">P</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="api/gripper.html#aiofranka.gripper.GripperController.position">position (aiofranka.gripper.GripperController property)</a>
+      <li><a href="api/payload.html#aiofranka.payload.payload_regressor">payload_regressor() (in module aiofranka.payload)</a>
+</li>
+      <li><a href="api/payload.html#aiofranka.payload.PayloadEstimate">PayloadEstimate (class in aiofranka.payload)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/gripper.html#aiofranka.gripper.GripperController.position">position (aiofranka.gripper.GripperController property)</a>
+</li>
+      <li><a href="api/payload.html#aiofranka.payload.PayloadEstimate.previous">previous (aiofranka.payload.PayloadEstimate attribute)</a>, <a href="api/payload.html#id4">[1]</a>
+</li>
       <li><a href="api/utilities.html#aiofranka.async_utils.ProcessProxy">ProcessProxy (class in aiofranka.async_utils)</a>
 </li>
   </ul></td>
@@ -359,7 +471,11 @@
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api/gripper.html#aiofranka.gripper.GripperController.qpos">qpos (aiofranka.gripper.GripperController property)</a>
+
+      <ul>
+        <li><a href="api/payload.html#aiofranka.payload.PayloadEstimate.qpos">(aiofranka.payload.PayloadEstimate attribute)</a>, <a href="api/payload.html#id9">[1]</a>
 </li>
+      </ul></li>
   </ul></td>
 </tr></table>
 
@@ -368,7 +484,15 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api/robot.html#aiofranka.robot.RobotInterface.real">real (aiofranka.robot.RobotInterface attribute)</a>
 </li>
+      <li><a href="api/payload.html#aiofranka.tools.remove_tool">remove_tool() (in module aiofranka.tools)</a>
+</li>
       <li><a href="api/robot.html#aiofranka.robot.require_pylibfranka">require_pylibfranka() (in module aiofranka.robot)</a>
+</li>
+      <li><a href="api/payload.html#aiofranka.payload.PayloadEstimate.residuals">residuals (aiofranka.payload.PayloadEstimate attribute)</a>, <a href="api/payload.html#id10">[1]</a>
+</li>
+      <li><a href="api/payload.html#aiofranka.payload.PayloadEstimate.rms_after">rms_after (aiofranka.payload.PayloadEstimate attribute)</a>, <a href="api/payload.html#id7">[1]</a>
+</li>
+      <li><a href="api/payload.html#aiofranka.payload.PayloadEstimate.rms_before">rms_before (aiofranka.payload.PayloadEstimate attribute)</a>, <a href="api/payload.html#id6">[1]</a>
 </li>
       <li><a href="api/controller.html#aiofranka.controller.FrankaController.robot">robot (aiofranka.controller.FrankaController attribute)</a>
 
@@ -379,6 +503,8 @@
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api/robot.html#aiofranka.robot.RobotInterface">RobotInterface (class in aiofranka.robot)</a>
+</li>
+      <li><a href="api/payload.html#aiofranka.tools.Tool.rotation">rotation (aiofranka.tools.Tool attribute)</a>, <a href="api/payload.html#id16">[1]</a>
 </li>
       <li><a href="api/utilities.html#aiofranka.async_utils.CudaInferenceThread.run">run() (aiofranka.async_utils.CudaInferenceThread method)</a>
 </li>
@@ -396,6 +522,12 @@
 <h2 id="S">S</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/config.html#aiofranka.config.same_controller">same_controller() (in module aiofranka.config)</a>
+</li>
+      <li><a href="api/config.html#aiofranka.config.save_sim">save_sim() (in module aiofranka.config)</a>
+</li>
+      <li><a href="api/payload.html#aiofranka.tools.save_tool">save_tool() (in module aiofranka.tools)</a>
+</li>
       <li><a href="api/remote.html#aiofranka.remote.ServerDiedError.server_error">server_error (aiofranka.remote.ServerDiedError attribute)</a>
 </li>
       <li><a href="api/remote.html#aiofranka.remote.ServerDiedError">ServerDiedError</a>
@@ -418,7 +550,13 @@
         <li><a href="api/remote.html#aiofranka.remote.FrankaRemoteController.set_freq">(aiofranka.remote.FrankaRemoteController method)</a>
 </li>
       </ul></li>
+      <li><a href="api/robot.html#aiofranka.robot.RobotInterface.set_load">set_load() (aiofranka.robot.RobotInterface method)</a>
+</li>
       <li><a href="api/robot.html#aiofranka.robot.set_macos_control_thread_qos">set_macos_control_thread_qos() (in module aiofranka.robot)</a>
+</li>
+      <li><a href="api/controller.html#aiofranka.controller.FrankaController.set_tcp">set_tcp() (aiofranka.controller.FrankaController method)</a>
+</li>
+      <li><a href="api/config.html#aiofranka.config.sim_entry">sim_entry() (in module aiofranka.config)</a>
 </li>
       <li><a href="api/robot.html#aiofranka.robot.RobotInterface.site_id">site_id (aiofranka.robot.RobotInterface attribute)</a>
 </li>
@@ -484,13 +622,21 @@
       </ul></li>
       <li><a href="api/robot.html#aiofranka.robot.RobotInterface.sync_mj">sync_mj() (aiofranka.robot.RobotInterface method)</a>
 </li>
+      <li><a href="api/robot.html#aiofranka.robot.RobotInterface.sync_payload">sync_payload() (aiofranka.robot.RobotInterface method)</a>
+</li>
   </ul></td>
 </tr></table>
 
 <h2 id="T">T</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/config.html#aiofranka.config.tcp_transform">tcp_transform() (in module aiofranka.config)</a>
+</li>
       <li><a href="api/controller.html#aiofranka.controller.FrankaController.test_connection">test_connection() (aiofranka.controller.FrankaController method)</a>
+</li>
+      <li><a href="api/config.html#aiofranka.config.to_yaml">to_yaml() (in module aiofranka.config)</a>
+</li>
+      <li><a href="api/payload.html#aiofranka.tools.Tool">Tool (class in aiofranka.tools)</a>
 </li>
       <li><a href="api/controller.html#aiofranka.controller.FrankaController.torque">torque (aiofranka.controller.FrankaController attribute)</a>
 
@@ -504,6 +650,8 @@
 </li>
       <li><a href="api/controller.html#aiofranka.controller.FrankaController.torque_diff_limit">torque_diff_limit (aiofranka.controller.FrankaController attribute)</a>
 </li>
+      <li><a href="api/payload.html#aiofranka.tools.Tool.translation">translation (aiofranka.tools.Tool attribute)</a>, <a href="api/payload.html#id15">[1]</a>
+</li>
       <li><a href="api/controller.html#aiofranka.controller.FrankaController.type">type (aiofranka.controller.FrankaController attribute)</a>
 </li>
   </ul></td>
@@ -511,6 +659,10 @@
 
 <h2 id="U">U</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/payload.html#aiofranka.tools.unload_tool">unload_tool() (in module aiofranka.tools)</a>
+</li>
+  </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api/server.html#aiofranka.server.unlock">unlock() (in module aiofranka.server)</a>
 </li>

@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Examples &mdash; aiofranka 0.5.1 documentation</title>
+  <title>Examples &mdash; aiofranka 0.6.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=b9afe91b"></script>
+      <script src="_static/documentation_options.js?v=8fa8b3e9"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/js/theme.js"></script>
@@ -70,6 +70,8 @@
 <li class="toctree-l1"><a class="reference internal" href="api/remote.html">FrankaRemoteController (Server Mode)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/controller.html">Franka Controller</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/robot.html">Robot Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/payload.html">Payload Identification and Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/config.html">Controller Configurations</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/server.html">Server Functions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/gripper.html">GripperController</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/utilities.html">Async Utilities</a></li>
@@ -338,6 +340,12 @@ Examples are shown in both server mode (sync) and async mode where applicable.</
 <span class="n">aiofranka</span><span class="o">.</span><span class="n">lock</span><span class="p">()</span>
 </pre></div>
 </div>
+<p>If you do not know the parameters, identify the tool with <code class="docutils literal notranslate"><span class="pre">aiofranka</span> <span class="pre">tool</span> <span class="pre">identify</span> <span class="pre">gripper</span></code>, which
+saves it as an end-effector profile in Desk. Activate a saved profile whenever its tool is mounted
+(see <a class="reference internal" href="controllers.html#payload-identification"><span class="std std-ref">Payload Identification</span></a>):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">aiofranka</span><span class="o">.</span><span class="n">load_tool</span><span class="p">(</span><span class="s2">"gripper"</span><span class="p">)</span>
+</pre></div>
+</div>
 </section>
 <section id="example-8-gripper-control">
 <h2>Example 8: Gripper Control<a class="headerlink" href="#example-8-gripper-control" title="Link to this heading"></a></h2>
@@ -428,7 +436,21 @@ IP as an optional argument and runs in MuJoCo without it:</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">00_move.py</span></code>: Move one joint (<code class="docutils literal notranslate"><span class="pre">--joint</span></code>, <code class="docutils literal notranslate"><span class="pre">--delta</span></code>)</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">01_joint_impedance.py</span></code>: Hold the current joint positions with joint impedance control</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">02_osc_hold.py</span></code>: Hold the current end-effector pose with operational space control</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">03_zero_torque.py</span></code>: Stream zero torque, so the robot only compensates gravity</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">03_zero_torque.py</span></code>: Stream zero torque, so the robot only compensates gravity. With a new tool
+on the flange, the arm should stay still; if it drifts, identify the tool with
+<code class="docutils literal notranslate"><span class="pre">aiofranka</span> <span class="pre">tool</span> <span class="pre">identify</span> <span class="pre">NAME</span></code> (see <a class="reference internal" href="controllers.html#payload-identification"><span class="std std-ref">Payload Identification</span></a>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">04_collect_joint_sysid.py</span></code>: Record steps, multisines and slow ramps with joint impedance at three
+poses, about 1.5 minutes, with a controller configuration (<code class="docutils literal notranslate"><span class="pre">--activate</span> <span class="pre">configs/joint_impedance.yaml</span></code>,
+see <a class="reference internal" href="controllers.html#controller-configurations"><span class="std std-ref">Controller Configuration Files</span></a>)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">05_fit_joint_sysid.py</span></code>: Fit kp, kd, damping and friction loss of each joint to the
+configuration’s latest recording with CMA-ES, simulating at your physics step (<code class="docutils literal notranslate"><span class="pre">--activate</span></code>,
+<code class="docutils literal notranslate"><span class="pre">--physics_dt</span></code>; <code class="docutils literal notranslate"><span class="pre">--traj</span></code> for another recording), and add the fit to the configuration’s
+<code class="docutils literal notranslate"><span class="pre">sim</span></code> section. The armature stays at fr3.xml’s, like the link inertias; <code class="docutils literal notranslate"><span class="pre">--fixed</span></code> chooses
+which parameters stay at their start values. Needs <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">mjbatch</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">06_collect_osc_sysid.py</span></code>: The same with operational space control
+(<code class="docutils literal notranslate"><span class="pre">--activate</span> <span class="pre">configs/osc.yaml</span></code>), about 2 minutes</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">07_fit_osc_sysid.py</span></code>: Fit ee_kp, ee_kd, null_kp, null_kd and each joint’s damping and friction
+loss to an OSC recording, weighing the TCP response and the joints</p></li>
 </ul>
 <p>Research scripts (system identification, SpaceMouse teleoperation, Robotiq gripper) are on the
 <a class="reference external" href="https://github.com/younghyopark/aiofranka/tree/research-scripts">research-scripts</a> branch.</p>

@@ -6,20 +6,20 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Robot Interface &mdash; aiofranka 0.5.1 documentation</title>
+  <title>Robot Interface &mdash; aiofranka 0.6.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=b9afe91b"></script>
+      <script src="../_static/documentation_options.js?v=8fa8b3e9"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Server Functions" href="server.html" />
+    <link rel="next" title="Payload Identification and Tools" href="payload.html" />
     <link rel="prev" title="Franka Controller" href="controller.html" /> 
 </head>
 
@@ -59,6 +59,8 @@
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Robot Interface</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#aiofranka.robot.set_macos_control_thread_qos"><code class="docutils literal notranslate"><span class="pre">set_macos_control_thread_qos()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#aiofranka.robot.require_pylibfranka"><code class="docutils literal notranslate"><span class="pre">require_pylibfranka()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#aiofranka.robot.merge_payload"><code class="docutils literal notranslate"><span class="pre">merge_payload()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#aiofranka.robot.link_inertial"><code class="docutils literal notranslate"><span class="pre">link_inertial()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#aiofranka.robot.RobotInterface"><code class="docutils literal notranslate"><span class="pre">RobotInterface</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#aiofranka.robot.RobotInterface.real"><code class="docutils literal notranslate"><span class="pre">RobotInterface.real</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aiofranka.robot.RobotInterface.model"><code class="docutils literal notranslate"><span class="pre">RobotInterface.model</span></code></a></li>
@@ -71,6 +73,8 @@
 <li class="toctree-l3"><a class="reference internal" href="#aiofranka.robot.RobotInterface.__init__"><code class="docutils literal notranslate"><span class="pre">RobotInterface.__init__()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aiofranka.robot.RobotInterface.start"><code class="docutils literal notranslate"><span class="pre">RobotInterface.start()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aiofranka.robot.RobotInterface.stop"><code class="docutils literal notranslate"><span class="pre">RobotInterface.stop()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aiofranka.robot.RobotInterface.set_load"><code class="docutils literal notranslate"><span class="pre">RobotInterface.set_load()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aiofranka.robot.RobotInterface.sync_payload"><code class="docutils literal notranslate"><span class="pre">RobotInterface.sync_payload()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aiofranka.robot.RobotInterface.sync_mj"><code class="docutils literal notranslate"><span class="pre">RobotInterface.sync_mj()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aiofranka.robot.RobotInterface.state"><code class="docutils literal notranslate"><span class="pre">RobotInterface.state</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aiofranka.robot.RobotInterface.state_minimal"><code class="docutils literal notranslate"><span class="pre">RobotInterface.state_minimal</span></code></a></li>
@@ -79,6 +83,8 @@
 </li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="payload.html">Payload Identification and Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="config.html">Controller Configurations</a></li>
 <li class="toctree-l1"><a class="reference internal" href="server.html">Server Functions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="gripper.html">GripperController</a></li>
 <li class="toctree-l1"><a class="reference internal" href="utilities.html">Async Utilities</a></li>
@@ -148,9 +154,38 @@ pylibfranka, for Apple Silicon and macOS 15 or newer.</p>
 </dl>
 </dd></dl>
 
+<dl class="py function">
+<dt class="sig sig-object py" id="aiofranka.robot.merge_payload">
+<span class="sig-prename descclassname"><span class="pre">aiofranka.robot.</span></span><span class="sig-name descname"><span class="pre">merge_payload</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">link_inertial</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mass</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">com</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inertia</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">site_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/aiofranka/robot.html#merge_payload"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aiofranka.robot.merge_payload" title="Link to this definition"></a></dt>
+<dd><p>Merge a payload on the flange into the last link of a MuJoCo FR3 model.</p>
+<p>Sets fr3_link7’s mass, center of mass and inertia to those of the link and the
+payload together (parallel axis theorem), as RobotInterface.sync_payload() does for
+the model aiofranka’s controllers use. Call mj_setConst() afterwards.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<em>mujoco.MjModel</em>) – Model to change</p></li>
+<li><p><strong>link_inertial</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.14)"><em>tuple</em></a>) – fr3_link7’s own mass, ipos, iquat and inertia, as in the
+unmodified model</p></li>
+<li><p><strong>mass</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Payload mass [kg]</p></li>
+<li><p><strong>com</strong> (<em>array-like</em>) – Payload center of mass in the flange frame [m] (3,)</p></li>
+<li><p><strong>inertia</strong> (<em>array-like</em>) – Payload inertia about its center of mass in the flange
+frame [kg m^2] (3, 3)</p></li>
+<li><p><strong>site_id</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em> | </em><em>None</em>) – The flange site (default: attachment_site)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="aiofranka.robot.link_inertial">
+<span class="sig-prename descclassname"><span class="pre">aiofranka.robot.</span></span><span class="sig-name descname"><span class="pre">link_inertial</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/aiofranka/robot.html#link_inertial"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aiofranka.robot.link_inertial" title="Link to this definition"></a></dt>
+<dd><p>fr3_link7’s mass, ipos, iquat and inertia, for merge_payload().</p>
+</dd></dl>
+
 <dl class="py class">
 <dt class="sig sig-object py" id="aiofranka.robot.RobotInterface">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">aiofranka.robot.</span></span><span class="sig-name descname"><span class="pre">RobotInterface</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ip</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/aiofranka/robot.html#RobotInterface"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aiofranka.robot.RobotInterface" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">aiofranka.robot.</span></span><span class="sig-name descname"><span class="pre">RobotInterface</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ip</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">read_tool</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/aiofranka/robot.html#RobotInterface"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aiofranka.robot.RobotInterface" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <p>High-level interface for Franka FR3 robot control.</p>
 <p>This class provides a unified interface for both real robot control (via pylibfranka)
@@ -265,12 +300,18 @@ and kinematics/dynamics computation.</p>
 </dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="aiofranka.robot.RobotInterface.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ip</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/aiofranka/robot.html#RobotInterface.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aiofranka.robot.RobotInterface.__init__" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ip</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">read_tool</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/aiofranka/robot.html#RobotInterface.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aiofranka.robot.RobotInterface.__init__" title="Link to this definition"></a></dt>
 <dd><p>Initialize robot interface.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>ip</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><em>None</em>) – Robot IP address (e.g., “172.16.0.2”) for real robot,
-or None for simulation mode.</p>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ip</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><em>None</em>) – Robot IP address (e.g., “172.16.0.2”) for real robot,
+or None for simulation mode.</p></li>
+<li><p><strong>read_tool</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>) – Read the end-effector profile active in Desk (robot.tool),
+which FrankaController.activate() checks configurations
+against, with the Desk credentials saved by aiofranka; it
+waits up to 3 s for Desk and never takes the control token</p></li>
+</ul>
 </dd>
 <dt class="field-even">Raises<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
@@ -314,6 +355,53 @@ control. Use FrankaController for automatic control loop management.</p>
 is in a safe configuration before stopping.</p>
 </dd>
 </dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="aiofranka.robot.RobotInterface.set_load">
+<span class="sig-name descname"><span class="pre">set_load</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mass</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">com</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(0.0,</span> <span class="pre">0.0,</span> <span class="pre">0.0)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inertia</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(0.0,</span> <span class="pre">0.0,</span> <span class="pre">0.0)</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/aiofranka/robot.html#RobotInterface.set_load"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aiofranka.robot.RobotInterface.set_load" title="Link to this definition"></a></dt>
+<dd><p>Set the load attached to the flange, e.g. a tool without a gripper.</p>
+<p>The load is set on the robot, whose internal controller compensates its
+gravity, and merged into the last link of the MuJoCo model with
+sync_payload(), so the mass matrix used by the OSC and the simulated
+dynamics include it. The flange frame is the attachment_site frame. A mass
+of 0 removes the load.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mass</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Load mass [kg]</p></li>
+<li><p><strong>com</strong> (<em>array-like</em>) – Center of mass in the flange frame [m] (3,)</p></li>
+<li><p><strong>inertia</strong> (<em>array-like</em>) – Inertia about the center of mass in the flange
+frame [kg m^2], as a (3, 3) tensor or its diagonal (3,)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If called while torque control is running</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Caveats:</dt><dd><ul class="simple">
+<li><p>Call before start(); the robot rejects the load during control</p></li>
+<li><p>libfranka adds the load to the active end-effector profile in Desk</p></li>
+<li><p>The load lasts until the next connection, which resets it. To keep a
+tool, save it as a profile with aiofranka.save_tool() and activate it
+with aiofranka.load_tool().</p></li>
+<li><p>The robot rejects a mass without inertia</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="aiofranka.robot.RobotInterface.sync_payload">
+<span class="sig-name descname"><span class="pre">sync_payload</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/aiofranka/robot.html#RobotInterface.sync_payload"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aiofranka.robot.RobotInterface.sync_payload" title="Link to this definition"></a></dt>
+<dd><p>Merge the payload that the robot compensates into the MuJoCo model.</p>
+<p>On the real robot, the payload is the end effector configured in Desk plus
+the load set with set_load(), from the last robot state read. In
+simulation, it is the load. It replaces the payload merged before, so the
+mass matrix used by the OSC matches what the robot compensates.</p>
+<p>RobotInterface calls this when it connects and in set_load(). Call it after
+changing the end effector in Desk while connected, after sync_mj().</p>
 </dd></dl>
 
 <dl class="py method">
@@ -432,7 +520,7 @@ are not needed. ~10x faster than full state property.</p>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="controller.html" class="btn btn-neutral float-left" title="Franka Controller" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="server.html" class="btn btn-neutral float-right" title="Server Functions" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="payload.html" class="btn btn-neutral float-right" title="Payload Identification and Tools" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

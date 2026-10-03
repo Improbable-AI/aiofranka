@@ -6,21 +6,21 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Server Functions &mdash; aiofranka 0.5.1 documentation</title>
+  <title>Server Functions &mdash; aiofranka 0.6.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=b9afe91b"></script>
+      <script src="../_static/documentation_options.js?v=8fa8b3e9"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="GripperController" href="gripper.html" />
-    <link rel="prev" title="Robot Interface" href="robot.html" /> 
+    <link rel="prev" title="Controller Configurations" href="config.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -57,6 +57,8 @@
 <li class="toctree-l1"><a class="reference internal" href="remote.html">FrankaRemoteController (Server Mode)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="controller.html">Franka Controller</a></li>
 <li class="toctree-l1"><a class="reference internal" href="robot.html">Robot Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="payload.html">Payload Identification and Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="config.html">Controller Configurations</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Server Functions</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#aiofranka.server.unlock"><code class="docutils literal notranslate"><span class="pre">unlock()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#aiofranka.server.lock"><code class="docutils literal notranslate"><span class="pre">lock()</span></code></a></li>
@@ -207,7 +209,9 @@ you provide are updated; omitted parameters are left unchanged.</p>
 <li><p><strong>inertia</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>]</em>) – Inertia matrix as [x11, x12, x13, x22, x23, x33] in kg*m^2.</p></li>
 <li><p><strong>translation</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>]</em>) – F_T_EE translation [x, y, z] in meters.</p></li>
 <li><p><strong>rotation</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>]</em>) – F_T_EE rotation [roll, pitch, yaw] in radians.</p></li>
-<li><p><strong>ee_name</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – End-effector name (default: current or “custom”).</p></li>
+<li><p><strong>ee_name</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – End-effector type: “None”, “FrankaHand”, “CobotPump”,
+“GenericCan” or “Other” (default: the current one, or “Other”
+when setting a mass without an end effector).</p></li>
 <li><p><strong>username</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Franka Desk web UI username.</p></li>
 <li><p><strong>password</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Franka Desk web UI password.</p></li>
 <li><p><strong>protocol</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – “http” or “https”.</p></li>
@@ -239,7 +243,7 @@ you provide are updated; omitted parameters are left unchanged.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="robot.html" class="btn btn-neutral float-left" title="Robot Interface" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="config.html" class="btn btn-neutral float-left" title="Controller Configurations" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="gripper.html" class="btn btn-neutral float-right" title="GripperController" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

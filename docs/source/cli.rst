@@ -15,6 +15,7 @@ The CLI handles robot setup, server lifecycle, and diagnostics.
    aiofranka mode     [--ip IP] [--set MODE] View/change operating mode
    aiofranka config   [--ip IP] [--mass M]   View/set end-effector config
    aiofranka tool     identify|load|list ... Identify, save and load tools
+   aiofranka camera   calibrate|fit          Locate a fixed camera relative to the robot
    aiofranka selftest [--ip IP] [--force]    Run safety self-tests
    aiofranka log      [-n LINES] [-f]        View server logs
    aiofranka gripper  --open|--close          Control the Robotiq gripper
@@ -139,6 +140,27 @@ From Python:
    aiofranka.save_tool("gripper", mass=0.62, com=[0.0, 0.0, 0.045])
    aiofranka.load_tool("gripper")
    aiofranka.list_tools()
+
+camera
+------
+
+Locate a fixed camera in the robot's base frame with an AprilCube held on the flange. Print
+aprilcube's calibration cube
+(`cube.3mf <https://github.com/younghyopark/aprilcube/blob/main/models/calibration_cube/cube.3mf>`_),
+mount it with its connector, start the camera with ``aiocamera start``, and make the cube's mass the
+active Desk profile. It needs the camera extra: ``pip install "aiofranka[camera]"``.
+
+.. code-block:: bash
+
+   aiofranka camera calibrate      # move the arm by hand; captures and fits into camera_calibration/<date>/
+   aiofranka camera fit SESSION    # fit a recorded session again
+
+``camera calibrate`` unlocks the robot like ``tool identify`` and runs it in gravity compensation
+with light damping (``--damping``, default 1 Nm s/rad), with a live view of the camera image in the
+terminal. Whenever the arm has rested for 0.7 s at a new pose, 5 cm or 10 deg from every view so
+far, with the cube in view, it records the view and beeps. Space captures anyway, ``u`` removes the
+last view, Enter fits and ``q`` quits keeping the views. The fit writes ``calibration.json`` with
+``T_base_camera``, ``T_ee_cube``, the intrinsics and the reprojection errors on held-out views.
 
 selftest
 --------

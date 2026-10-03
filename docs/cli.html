@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CLI Reference &mdash; aiofranka 0.5.1 documentation</title>
+  <title>CLI Reference &mdash; aiofranka 0.6.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=b9afe91b"></script>
+      <script src="_static/documentation_options.js?v=8fa8b3e9"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/js/theme.js"></script>
@@ -54,6 +54,8 @@
 <li class="toctree-l2"><a class="reference internal" href="#stop">stop</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#mode">mode</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#config">config</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#tool">tool</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#camera">camera</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#selftest">selftest</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#log">log</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#common-flags">Common Flags</a></li>
@@ -68,6 +70,8 @@
 <li class="toctree-l1"><a class="reference internal" href="api/remote.html">FrankaRemoteController (Server Mode)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/controller.html">Franka Controller</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/robot.html">Robot Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/payload.html">Payload Identification and Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/config.html">Controller Configurations</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/server.html">Server Functions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/gripper.html">GripperController</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/utilities.html">Async Utilities</a></li>
@@ -109,6 +113,8 @@ aiofranka status   [--ip IP]              Show robot &amp; server status
 aiofranka stop     [--ip IP]              Stop a running server
 aiofranka mode     [--ip IP] [--set MODE] View/change operating mode
 aiofranka config   [--ip IP] [--mass M]   View/set end-effector config
+aiofranka tool     identify|load|list ... Identify, save and load tools
+aiofranka camera   calibrate|fit          Locate a fixed camera relative to the robot
 aiofranka selftest [--ip IP] [--force]    Run safety self-tests
 aiofranka log      [-n LINES] [-f]        View server logs
 aiofranka gripper  --open|--close          Control the Robotiq gripper
@@ -172,7 +178,8 @@ aiofranka<span class="w"> </span>mode<span class="w"> </span>--set<span class="w
 <section id="config">
 <h2>config<a class="headerlink" href="#config" title="Link to this heading"></a></h2>
 <p>View or set the end-effector configuration (mass, center of mass, inertia,
-flange-to-EE transform). Changes are applied via the Franka Desk API.</p>
+flange-to-EE transform). Changes are applied via the Franka Desk API to the active
+end-effector profile; to keep several tools by name, use <code class="docutils literal notranslate"><span class="pre">aiofranka</span> <span class="pre">tool</span></code> below.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>aiofranka<span class="w"> </span>config<span class="w">                                </span><span class="c1"># view current config</span>
 aiofranka<span class="w"> </span>config<span class="w"> </span>--mass<span class="w"> </span><span class="m">0</span>.5<span class="w"> </span>--com<span class="w"> </span><span class="m">0</span>,0,0.03<span class="w">      </span><span class="c1"># set mass + CoM</span>
 aiofranka<span class="w"> </span>config<span class="w"> </span>--translation<span class="w"> </span><span class="m">0</span>,0,0.1<span class="w">           </span><span class="c1"># set flange-to-EE offset</span>
@@ -185,6 +192,51 @@ aiofranka<span class="w"> </span>config<span class="w"> </span>--translation<spa
 <span class="n">aiofranka</span><span class="o">.</span><span class="n">lock</span><span class="p">()</span>
 </pre></div>
 </div>
+</section>
+<section id="tool">
+<h2>tool<a class="headerlink" href="#tool" title="Link to this heading"></a></h2>
+<p>Identify the tool on the flange and keep it as an end-effector profile in Desk (Settings &gt; End
+Effector), the same profiles the web UI shows. The robot compensates the active profile, and
+<code class="docutils literal notranslate"><span class="pre">RobotInterface</span></code> merges it into the MuJoCo model when it connects.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>aiofranka<span class="w"> </span>tool<span class="w"> </span>identify<span class="w"> </span>gripper<span class="w">   </span><span class="c1"># move through 16 poses, save as profile "gripper", activate it</span>
+aiofranka<span class="w"> </span>tool<span class="w"> </span>load<span class="w"> </span>gripper<span class="w">       </span><span class="c1"># activate a profile</span>
+aiofranka<span class="w"> </span>tool<span class="w"> </span>unload<span class="w">             </span><span class="c1"># activate the built-in "No End Effector" profile</span>
+aiofranka<span class="w"> </span>tool<span class="w"> </span>list<span class="w">               </span><span class="c1"># list the profiles, marking the active one</span>
+aiofranka<span class="w"> </span>tool<span class="w"> </span>remove<span class="w"> </span>gripper<span class="w">     </span><span class="c1"># delete a profile</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">tool</span> <span class="pre">identify</span></code> unlocks the robot like <code class="docutils literal notranslate"><span class="pre">aiofranka</span> <span class="pre">home</span></code> and plans the poses around the current
+one, so move the arm to an open pose first. Describe the tool for the collision checks with
+<code class="docutils literal notranslate"><span class="pre">--tool-length</span></code> and <code class="docutils literal notranslate"><span class="pre">--tool-radius</span></code> (default 0.2 m and 0.1 m), and the table with <code class="docutils literal notranslate"><span class="pre">--floor</span></code>
+(default 0, the mounting plane; the robot keeps 5 cm from it). It shows the estimate and
+asks before saving it, offering to edit the mass (in g) and the center of mass (in mm), e.g. to use
+a scale reading; an existing profile keeps its tool center point and inertia. <code class="docutils literal notranslate"><span class="pre">--no-load</span></code> saves
+it without activating it. See <a class="reference internal" href="controllers.html#payload-identification"><span class="std std-ref">Payload Identification</span></a>.</p>
+<p>From Python:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">aiofranka</span>
+<span class="n">aiofranka</span><span class="o">.</span><span class="n">save_tool</span><span class="p">(</span><span class="s2">"gripper"</span><span class="p">,</span> <span class="n">mass</span><span class="o">=</span><span class="mf">0.62</span><span class="p">,</span> <span class="n">com</span><span class="o">=</span><span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.045</span><span class="p">])</span>
+<span class="n">aiofranka</span><span class="o">.</span><span class="n">load_tool</span><span class="p">(</span><span class="s2">"gripper"</span><span class="p">)</span>
+<span class="n">aiofranka</span><span class="o">.</span><span class="n">list_tools</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="camera">
+<h2>camera<a class="headerlink" href="#camera" title="Link to this heading"></a></h2>
+<p>Locate a fixed camera in the robot’s base frame with an AprilCube held on the flange. Print
+aprilcube’s calibration cube
+(<a class="reference external" href="https://github.com/younghyopark/aprilcube/blob/main/models/calibration_cube/cube.3mf">cube.3mf</a>),
+mount it with its connector, start the camera with <code class="docutils literal notranslate"><span class="pre">aiocamera</span> <span class="pre">start</span></code>, and make the cube’s mass the
+active Desk profile. It needs the camera extra: <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">&quot;aiofranka[camera]&quot;</span></code>.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>aiofranka<span class="w"> </span>camera<span class="w"> </span>calibrate<span class="w">      </span><span class="c1"># move the arm by hand; captures and fits into camera_calibration/&lt;date&gt;/</span>
+aiofranka<span class="w"> </span>camera<span class="w"> </span>fit<span class="w"> </span>SESSION<span class="w">    </span><span class="c1"># fit a recorded session again</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">camera</span> <span class="pre">calibrate</span></code> unlocks the robot like <code class="docutils literal notranslate"><span class="pre">tool</span> <span class="pre">identify</span></code> and runs it in gravity compensation
+with light damping (<code class="docutils literal notranslate"><span class="pre">--damping</span></code>, default 1 Nm s/rad), with a live view of the camera image in the
+terminal. Whenever the arm has rested for 0.7 s at a new pose, 5 cm or 10 deg from every view so
+far, with the cube in view, it records the view and beeps. Space captures anyway, <code class="docutils literal notranslate"><span class="pre">u</span></code> removes the
+last view, Enter fits and <code class="docutils literal notranslate"><span class="pre">q</span></code> quits keeping the views. The fit writes <code class="docutils literal notranslate"><span class="pre">calibration.json</span></code> with
+<code class="docutils literal notranslate"><span class="pre">T_base_camera</span></code>, <code class="docutils literal notranslate"><span class="pre">T_ee_cube</span></code>, the intrinsics and the reprojection errors on held-out views.</p>
 </section>
 <section id="selftest">
 <h2>selftest<a class="headerlink" href="#selftest" title="Link to this heading"></a></h2>
