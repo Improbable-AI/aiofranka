@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.1 - 2026-10-03
+
+### Changes
+
+- `aiofranka mode program` switches to Programming to hand-guide the robot, as Desk's mode switch does: it deactivates FCI, opens the brakes if they are closed and hands the control token back to Desk. `aiofranka mode execute` switches back. They replace `aiofranka mode --set`.
+- `aiofranka unlock` runs the self-tests when they are overdue, as `aiofranka.unlock()` does. Both, and the server, switch from Programming back to Execution before activating FCI.
+
 ## 0.6.0 - 2026-10-03
 
 ### Highlights

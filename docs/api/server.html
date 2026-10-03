@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Server Functions &mdash; aiofranka 0.6.0 documentation</title>
+  <title>Server Functions &mdash; aiofranka 0.6.1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=8fa8b3e9"></script>
+      <script src="../_static/documentation_options.js?v=2bd037f0"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../_static/js/theme.js"></script>
@@ -102,6 +102,8 @@
 <dt class="sig sig-object py" id="aiofranka.server.unlock">
 <span class="sig-prename descclassname"><span class="pre">aiofranka.server.</span></span><span class="sig-name descname"><span class="pre">unlock</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ip</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">username</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">password</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">protocol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'https'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/aiofranka/server.html#unlock"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aiofranka.server.unlock" title="Link to this definition"></a></dt>
 <dd><p>Unlock the robot joints (open brakes) and activate FCI.</p>
+<p>It first recovers safety errors, runs the self-tests if they are overdue and
+switches from Programming to Execution, where FCI runs.</p>
 <p>The control token is kept (saved to disk) so FCI stays active.
 Call lock() to deactivate FCI, lock joints, and release the token.</p>
 <p>If a server is running, this is a no-op (robot is already unlocked).</p>

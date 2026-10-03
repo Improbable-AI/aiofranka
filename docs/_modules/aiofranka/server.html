@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>aiofranka.server &mdash; aiofranka 0.5.1 documentation</title>
+  <title>aiofranka.server &mdash; aiofranka 0.6.1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=b9afe91b"></script>
+      <script src="../../_static/documentation_options.js?v=2bd037f0"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../../_static/js/theme.js"></script>
@@ -54,6 +54,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../../api/remote.html">FrankaRemoteController (Server Mode)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../api/controller.html">Franka Controller</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../api/robot.html">Robot Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/payload.html">Payload Identification and Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/config.html">Controller Configurations</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../api/server.html">Server Functions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../api/gripper.html">GripperController</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../api/utilities.html">Async Utilities</a></li>
@@ -970,14 +972,32 @@
         <span class="k">return</span> <span class="s2">""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">change_operating_mode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"Execution"</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">"""Change the operating mode (currently only "Execution" is supported)."""</span>
+<span class="w">        </span><span class="sd">"""Change the operating mode to "Execution" or "Programming" (needs the control token).</span>
+
+<span class="sd">        The Desk API only changes to Execution. Programming goes through the endpoint of</span>
+<span class="sd">        the Desk web UI's mode switch, which takes the UI's login cookie.</span>
+<span class="sd">        """</span>
         <span class="k">def</span><span class="w"> </span><span class="nf">_do</span><span class="p">():</span>
-            <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_req</span><span class="p">(</span><span class="s2">"POST"</span><span class="p">,</span> <span class="s2">"/api/system/operating-mode:change"</span><span class="p">,</span>
-                           <span class="n">json</span><span class="o">=</span><span class="p">{</span><span class="s2">"desiredOperatingMode"</span><span class="p">:</span> <span class="n">mode</span><span class="p">},</span>
-                           <span class="n">headers</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_headers</span><span class="p">())</span>
+            <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">"Execution"</span><span class="p">:</span>
+                <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_req</span><span class="p">(</span><span class="s2">"POST"</span><span class="p">,</span> <span class="s2">"/api/system/operating-mode:change"</span><span class="p">,</span>
+                               <span class="n">json</span><span class="o">=</span><span class="p">{</span><span class="s2">"desiredOperatingMode"</span><span class="p">:</span> <span class="n">mode</span><span class="p">},</span>
+                               <span class="n">headers</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_headers</span><span class="p">())</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_req</span><span class="p">(</span><span class="s2">"POST"</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"/desk/api/operating-mode/</span><span class="si">{</span><span class="n">mode</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span>
+                               <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">"X-Control-Token"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_token</span><span class="p">},</span>
+                               <span class="n">cookies</span><span class="o">=</span><span class="p">{</span><span class="s2">"authorization"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_login_cookie</span><span class="p">()})</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_check</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="s2">"change_operating_mode"</span><span class="p">)</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Operating mode changed to </span><span class="si">{</span><span class="n">mode</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_with_retry</span><span class="p">(</span><span class="n">_do</span><span class="p">,</span> <span class="n">context</span><span class="o">=</span><span class="s2">"change_operating_mode"</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_login_cookie</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Log in as the Desk web UI does, for the endpoints only the UI uses."""</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">aiofranka.client</span><span class="w"> </span><span class="kn">import</span> <span class="n">FrankaClient</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_req</span><span class="p">(</span><span class="s2">"POST"</span><span class="p">,</span> <span class="s2">"/admin/api/login"</span><span class="p">,</span>
+                       <span class="n">json</span><span class="o">=</span><span class="p">{</span><span class="s2">"login"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_username</span><span class="p">,</span>
+                             <span class="s2">"password"</span><span class="p">:</span> <span class="n">FrankaClient</span><span class="o">.</span><span class="n">_encode_password</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_username</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_password</span><span class="p">)})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="s2">"login"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">r</span><span class="o">.</span><span class="n">text</span>
 
     <span class="c1"># ── Arm info ─────────────────────────────────────────────────────</span>
 
@@ -1022,6 +1042,10 @@
             <span class="n">client</span><span class="o">.</span><span class="n">execute_self_tests</span><span class="p">()</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"Self-tests completed"</span><span class="p">)</span>
             <span class="n">step</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="c1"># FCI only activates in Execution, e.g. not after hand guiding in Programming</span>
+        <span class="k">if</span> <span class="n">client</span><span class="o">.</span><span class="n">get_operating_mode</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"Programming"</span><span class="p">:</span>
+            <span class="n">client</span><span class="o">.</span><span class="n">change_operating_mode</span><span class="p">(</span><span class="s2">"Execution"</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">on_progress</span><span class="p">:</span>
             <span class="n">on_progress</span><span class="p">(</span><span class="n">step</span><span class="p">,</span> <span class="s2">"Unlocking joints"</span><span class="p">)</span>
@@ -1220,7 +1244,7 @@
     <span class="c1"># asyncio control loop (libfranka requires strict 1kHz timing).</span>
     <span class="k">if</span> <span class="n">controller_cls</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">controller_cls</span> <span class="o">=</span> <span class="n">ServerController</span>
-    <span class="n">robot</span> <span class="o">=</span> <span class="n">RobotInterface</span><span class="p">(</span><span class="n">robot_ip</span><span class="p">)</span>
+    <span class="n">robot</span> <span class="o">=</span> <span class="n">RobotInterface</span><span class="p">(</span><span class="n">robot_ip</span><span class="p">,</span> <span class="n">read_tool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
     <span class="n">controller</span> <span class="o">=</span> <span class="n">controller_cls</span><span class="p">(</span><span class="n">robot</span><span class="p">,</span> <span class="n">shm</span><span class="p">)</span>
     <span class="n">cmd_handler</span> <span class="o">=</span> <span class="n">CommandHandler</span><span class="p">(</span><span class="n">controller</span><span class="p">,</span> <span class="n">shm</span><span class="p">,</span> <span class="n">robot_ip</span><span class="p">)</span>
     <span class="n">cmd_handler</span><span class="o">.</span><span class="n">_loop</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">get_event_loop</span><span class="p">()</span>
@@ -1296,7 +1320,7 @@
                     <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
 
                     <span class="c1"># 7. New robot + controller (old C++ object may be in bad state)</span>
-                    <span class="n">robot</span> <span class="o">=</span> <span class="n">RobotInterface</span><span class="p">(</span><span class="n">robot_ip</span><span class="p">)</span>
+                    <span class="n">robot</span> <span class="o">=</span> <span class="n">RobotInterface</span><span class="p">(</span><span class="n">robot_ip</span><span class="p">,</span> <span class="n">read_tool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
                     <span class="n">controller</span> <span class="o">=</span> <span class="n">controller_cls</span><span class="p">(</span><span class="n">robot</span><span class="p">,</span> <span class="n">shm</span><span class="p">)</span>
                     <span class="n">cmd_handler</span><span class="o">.</span><span class="n">controller</span> <span class="o">=</span> <span class="n">controller</span>  <span class="c1"># update ZMQ handler ref</span>
 
@@ -1569,7 +1593,7 @@
 <span class="sd">    """</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">aiofranka.controller</span><span class="w"> </span><span class="kn">import</span> <span class="n">FrankaController</span>
 
-    <span class="n">robot</span> <span class="o">=</span> <span class="n">RobotInterface</span><span class="p">(</span><span class="n">robot_ip</span><span class="p">)</span>
+    <span class="n">robot</span> <span class="o">=</span> <span class="n">RobotInterface</span><span class="p">(</span><span class="n">robot_ip</span><span class="p">,</span> <span class="n">read_tool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
     <span class="n">controller</span> <span class="o">=</span> <span class="n">FrankaController</span><span class="p">(</span><span class="n">robot</span><span class="p">)</span>
     <span class="n">controller</span><span class="o">.</span><span class="n">kp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span>
     <span class="n">controller</span><span class="o">.</span><span class="n">kd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span> <span class="o">*</span> <span class="n">damping</span>
@@ -1657,7 +1681,7 @@
 <span class="w">    </span><span class="sd">"""Move robot to home position. Assumes robot is already unlocked with FCI active."""</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">aiofranka.controller</span><span class="w"> </span><span class="kn">import</span> <span class="n">FrankaController</span>
 
-    <span class="n">robot</span> <span class="o">=</span> <span class="n">RobotInterface</span><span class="p">(</span><span class="n">robot_ip</span><span class="p">)</span>
+    <span class="n">robot</span> <span class="o">=</span> <span class="n">RobotInterface</span><span class="p">(</span><span class="n">robot_ip</span><span class="p">,</span> <span class="n">read_tool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
     <span class="n">controller</span> <span class="o">=</span> <span class="n">FrankaController</span><span class="p">(</span><span class="n">robot</span><span class="p">)</span>
 
     <span class="n">base</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mf">0.6</span><span class="p">,</span> <span class="mf">0.6</span><span class="p">,</span> <span class="mf">0.6</span><span class="p">])</span>
@@ -2079,6 +2103,9 @@
            <span class="n">protocol</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"https"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Unlock the robot joints (open brakes) and activate FCI.</span>
 
+<span class="sd">    It first recovers safety errors, runs the self-tests if they are overdue and</span>
+<span class="sd">    switches from Programming to Execution, where FCI runs.</span>
+
 <span class="sd">    The control token is kept (saved to disk) so FCI stays active.</span>
 <span class="sd">    Call lock() to deactivate FCI, lock joints, and release the token.</span>
 
@@ -2126,6 +2153,11 @@
     <span class="k">if</span> <span class="n">self_test_due</span><span class="p">:</span>
         <span class="n">total</span> <span class="o">+=</span> <span class="mi">1</span>  <span class="c1"># extra step for self-tests</span>
 
+    <span class="c1"># FCI only activates in Execution: switch back from Programming (hand guiding)</span>
+    <span class="n">programming</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">get_operating_mode</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"Programming"</span>
+    <span class="k">if</span> <span class="n">programming</span><span class="p">:</span>
+        <span class="n">total</span> <span class="o">+=</span> <span class="mi">1</span>  <span class="c1"># extra step for the switch</span>
+
     <span class="k">if</span> <span class="n">client</span><span class="o">.</span><span class="n">_token</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">_run_with_spinner</span><span class="p">(</span><span class="s2">"Acquiring control token"</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">total</span><span class="p">,</span>
                           <span class="k">lambda</span><span class="p">:</span> <span class="n">client</span><span class="o">.</span><span class="n">_with_retry</span><span class="p">(</span>
@@ -2147,6 +2179,11 @@
         <span class="k">if</span> <span class="n">self_test_due</span><span class="p">:</span>
             <span class="n">_run_with_spinner</span><span class="p">(</span><span class="s2">"Running self-tests (overdue)"</span><span class="p">,</span> <span class="n">step</span><span class="p">,</span> <span class="n">total</span><span class="p">,</span>
                               <span class="n">client</span><span class="o">.</span><span class="n">execute_self_tests</span><span class="p">)</span>
+            <span class="n">step</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">if</span> <span class="n">programming</span><span class="p">:</span>
+            <span class="n">_run_with_spinner</span><span class="p">(</span><span class="s2">"Switching to Execution"</span><span class="p">,</span> <span class="n">step</span><span class="p">,</span> <span class="n">total</span><span class="p">,</span>
+                              <span class="n">client</span><span class="o">.</span><span class="n">change_operating_mode</span><span class="p">,</span> <span class="s2">"Execution"</span><span class="p">)</span>
             <span class="n">step</span> <span class="o">+=</span> <span class="mi">1</span>
 
         <span class="c1"># Unlock joints</span>
@@ -2197,7 +2234,9 @@
 <span class="sd">        inertia: Inertia matrix as [x11, x12, x13, x22, x23, x33] in kg*m^2.</span>
 <span class="sd">        translation: F_T_EE translation [x, y, z] in meters.</span>
 <span class="sd">        rotation: F_T_EE rotation [roll, pitch, yaw] in radians.</span>
-<span class="sd">        ee_name: End-effector name (default: current or "custom").</span>
+<span class="sd">        ee_name: End-effector type: "None", "FrankaHand", "CobotPump",</span>
+<span class="sd">            "GenericCan" or "Other" (default: the current one, or "Other"</span>
+<span class="sd">            when setting a mass without an end effector).</span>
 <span class="sd">        username: Franka Desk web UI username.</span>
 <span class="sd">        password: Franka Desk web UI password.</span>
 <span class="sd">        protocol: "http" or "https".</span>
@@ -2258,7 +2297,10 @@
         <span class="n">cur_params</span> <span class="o">=</span> <span class="n">cur_ee</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"params"</span><span class="p">,</span> <span class="p">{})</span>
 
         <span class="k">if</span> <span class="n">ee_name</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">ee_name</span> <span class="o">=</span> <span class="n">cur_ee</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"name"</span><span class="p">,</span> <span class="s2">"custom"</span><span class="p">)</span>
+            <span class="n">ee_name</span> <span class="o">=</span> <span class="n">cur_ee</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"name"</span><span class="p">,</span> <span class="s2">"Other"</span><span class="p">)</span>
+            <span class="c1"># A mass needs an end effector to belong to.</span>
+            <span class="k">if</span> <span class="n">ee_name</span> <span class="o">==</span> <span class="s2">"None"</span> <span class="ow">and</span> <span class="n">mass</span><span class="p">:</span>
+                <span class="n">ee_name</span> <span class="o">=</span> <span class="s2">"Other"</span>
 
         <span class="c1"># Merge: start from current, override with user-provided values</span>
         <span class="n">merged</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">cur_params</span><span class="p">)</span>
